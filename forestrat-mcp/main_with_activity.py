@@ -12,6 +12,10 @@ from typing import Any, Dict, List, Optional, Sequence
 from datetime import datetime, date
 import sys
 from pathlib import Path
+import matplotlib.pyplot as plt
+import seaborn as sns
+import base64
+import io
 
 # Add the parent directory to the path to import from the main project
 sys.path.append(str(Path(__file__).parent.parent))
@@ -202,6 +206,69 @@ class ForestratMCPServer:
                             "required": ["date", "exchange"],
                             "additionalProperties": False
                         }
+                    ),
+                    Tool(
+                        name="get_least_active_symbols",
+                        description="Get the least active symbols for a specific date based on volume or trade count",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {
+                                "date": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "Date to analyze (YYYY-MM-DD)"
+                                },
+                                "exchange": {
+                                    "type": "string",
+                                    "description": "Exchange name (LSE, CME, NYQ)"
+                                },
+                                "metric": {
+                                    "type": "string",
+                                    "enum": ["volume", "trade_count"],
+                                    "description": "Metric to use for activity (volume or trade_count)"
+                                },
+                                "limit": {
+                                    "type": "integer",
+                                    "description": "Number of bottom symbols to return (default: 10)"
+                                }
+                            },
+                            "required": ["date", "exchange"],
+                            "additionalProperties": False
+                        }
+                    ),
+                    Tool(
+                        name="create_activity_plot",
+                        description="Create a bar chart plot showing symbol activity (most/least active symbols)",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {
+                                "date": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "Date to analyze (YYYY-MM-DD)"
+                                },
+                                "exchange": {
+                                    "type": "string",
+                                    "description": "Exchange name (LSE, CME, NYQ)"
+                                },
+                                "plot_type": {
+                                    "type": "string",
+                                    "enum": ["most_active", "least_active", "both"],
+                                    "description": "Type of plot to create"
+                                },
+                                "metric": {
+                                    "type": "string",
+                                    "enum": ["volume", "trade_count"],
+                                    "description": "Metric to use for activity (volume or trade_count)"
+                                },
+                                "limit": {
+                                    "type": "integer",
+                                    "description": "Number of symbols to include in plot (default: 10)"
+                                }
+                            },
+                            "required": ["date", "exchange", "plot_type"],
+                            "additionalProperties": False
+                        }
                     )
                 ]
             return ListToolsResult(
@@ -249,6 +316,14 @@ class ForestratMCPServer:
                     result = await self._get_least_active_symbols(
                         arguments["date"],
                         arguments["exchange"],
+                        arguments.get("metric", "trade_count"),
+                        arguments.get("limit", 10)
+                    )
+                elif name == "create_activity_plot":
+                    result = await self._create_activity_plot(
+                        arguments["date"],
+                        arguments["exchange"],
+                        arguments["plot_type"],
                         arguments.get("metric", "trade_count"),
                         arguments.get("limit", 10)
                     )
@@ -707,6 +782,148 @@ class ForestratMCPServer:
             
         except Exception as e:
             logger.error(f"Error getting least active symbols: {e}")
+            raise
+    
+    async def _create_activity_plot(
+        self, 
+        date: str, 
+        exchange: str, 
+        plot_type: str,
+        metric: str = "trade_count",
+        limit: int = 10
+    ) -> Dict[str, Any]:
+        """Create a bar chart plot showing symbol activity"""
+        try:
+            # Set matplotlib to use a non-interactive backend
+            plt.switch_backend('Agg')
+            
+            # Configure seaborn style
+            sns.set_style("whitegrid")
+            
+            # Get data based on plot type
+            if plot_type == "most_active":
+                data_result = await self._get_most_active_symbols(date, exchange, metric, limit)
+                title_prefix = "Most Active"
+                color = "steelblue"
+            elif plot_type == "least_active":
+                data_result = await self._get_least_active_symbols(date, exchange, metric, limit)
+                title_prefix = "Least Active"
+                color = "coral"
+            elif plot_type == "both":
+                # Get both most and least active
+                most_active = await self._get_most_active_symbols(date, exchange, metric, limit//2)
+                least_active = await self._get_least_active_symbols(date, exchange, metric, limit//2)
+                
+                # Create subplot
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+                
+                # Plot most active
+                if most_active.get("symbols"):
+                    most_symbols = [item["symbol"] for item in most_active["symbols"]]
+                    most_values = [item.get(f"total_{metric}", item.get(metric, 0)) for item in most_active["symbols"]]
+                    
+                    ax1.bar(range(len(most_symbols)), most_values, color="steelblue")
+                    ax1.set_title(f"Most Active Symbols - {exchange} ({date})")
+                    ax1.set_xlabel("Symbols")
+                    ax1.set_ylabel(metric.replace("_", " ").title())
+                    ax1.set_xticks(range(len(most_symbols)))
+                    ax1.set_xticklabels(most_symbols, rotation=45, ha='right')
+                
+                # Plot least active
+                if least_active.get("symbols"):
+                    least_symbols = [item["symbol"] for item in least_active["symbols"]]
+                    least_values = [item.get(f"total_{metric}", item.get(metric, 0)) for item in least_active["symbols"]]
+                    
+                    ax2.bar(range(len(least_symbols)), least_values, color="coral")
+                    ax2.set_title(f"Least Active Symbols - {exchange} ({date})")
+                    ax2.set_xlabel("Symbols")
+                    ax2.set_ylabel(metric.replace("_", " ").title())
+                    ax2.set_xticks(range(len(least_symbols)))
+                    ax2.set_xticklabels(least_symbols, rotation=45, ha='right')
+                
+                plt.tight_layout()
+                
+                # Save plot to base64
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+                buffer.seek(0)
+                plot_base64 = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+                
+                return {
+                    "date": date,
+                    "exchange": exchange,
+                    "plot_type": plot_type,
+                    "metric": metric,
+                    "plot_data": {
+                        "most_active": most_active,
+                        "least_active": least_active
+                    },
+                    "plot_image_base64": plot_base64,
+                    "plot_format": "png"
+                }
+            else:
+                return {
+                    "error": f"Invalid plot_type: {plot_type}. Must be 'most_active', 'least_active', or 'both'"
+                }
+            
+            # Single plot handling (most_active or least_active)
+            if "error" in data_result:
+                return data_result
+            
+            if not data_result.get("symbols"):
+                return {
+                    "date": date,
+                    "exchange": exchange,
+                    "error": f"No data found for {exchange} on {date}",
+                    "plot_image_base64": None
+                }
+            
+            # Extract data for plotting
+            symbols = [item["symbol"] for item in data_result["symbols"]]
+            values = [item.get(f"total_{metric}", item.get(metric, 0)) for item in data_result["symbols"]]
+            
+            # Create the plot
+            fig, ax = plt.subplots(figsize=(12, 6))
+            bars = ax.bar(range(len(symbols)), values, color=color)
+            
+            # Customize the plot
+            ax.set_title(f"{title_prefix} Symbols - {exchange} ({date})")
+            ax.set_xlabel("Symbols")
+            ax.set_ylabel(metric.replace("_", " ").title())
+            ax.set_xticks(range(len(symbols)))
+            ax.set_xticklabels(symbols, rotation=45, ha='right')
+            
+            # Add value labels on bars
+            for i, (bar, value) in enumerate(zip(bars, values)):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{value:,}' if isinstance(value, (int, float)) else str(value),
+                       ha='center', va='bottom', fontsize=8)
+            
+            plt.tight_layout()
+            
+            # Save plot to base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+            buffer.seek(0)
+            plot_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return {
+                "date": date,
+                "exchange": exchange,
+                "plot_type": plot_type,
+                "metric": metric,
+                "symbol_count": len(symbols),
+                "plot_data": data_result,
+                "plot_image_base64": plot_base64,
+                "plot_format": "png",
+                "note": f"Plot showing {title_prefix.lower()} symbols by {metric}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating activity plot: {e}")
             raise
 
     def _resolve_table_name(self, dataset: str) -> str:

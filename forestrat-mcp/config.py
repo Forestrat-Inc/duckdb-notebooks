@@ -27,16 +27,16 @@ class Config:
     
     # Exchange mappings
     EXCHANGE_TABLE_MAPPING = {
-        'LSE': 'bronze.lse_market_data',
-        'CME': 'bronze.cme_market_data',
-        'NYQ': 'bronze.nyq_market_data'
+        'LSE': 'bronze.lse_market_data_raw',
+        'CME': 'bronze.cme_market_data_raw',
+        'NYQ': 'bronze.nyq_market_data_raw'
     }
     
     # Dataset mappings
     DATASET_MAPPING = {
-        'lse': 'bronze.lse_market_data',
-        'cme': 'bronze.cme_market_data',
-        'nyq': 'bronze.nyq_market_data',
+        'lse': 'bronze.lse_market_data_raw',
+        'cme': 'bronze.cme_market_data_raw',
+        'nyq': 'bronze.nyq_market_data_raw',
         'unified': 'silver.market_data_unified',
         'market_data': 'silver.market_data_unified',
         'timeseries': 'silver.price_timeseries',

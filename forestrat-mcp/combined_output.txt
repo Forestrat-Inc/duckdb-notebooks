@@ -1,0 +1,17 @@
+2025-06-25 16:39:03,534 - database.DuckDBConnection - INFO - Initialized DuckDB connection manager for /Users/kaushal/Documents/Forestrat/duckdb/multi_exchange_data_lake.duckdb
+2025-06-25 16:39:03,535 - __main__ - INFO - Forestrat MCP Server initialized
+2025-06-25 16:39:03,535 - __main__ - INFO - Starting Forestrat MCP server
+2025-06-25 16:39:03,536 - __main__ - INFO - 📥 Raw request received: {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}
+2025-06-25 16:39:03,536 - __main__ - INFO - 📨 Received request - Method: initialize, ID: 1
+2025-06-25 16:39:03,536 - __main__ - INFO - 📋 Request params: {
+  "protocolVersion": "2024-11-05",
+  "capabilities": {},
+  "clientInfo": {
+    "name": "test-client",
+    "version": "1.0.0"
+  }
+}
+2025-06-25 16:39:03,536 - __main__ - INFO - 🚀 Handling initialization request
+2025-06-25 16:39:03,536 - __main__ - INFO - Handling initialize request
+{"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "forestrat-mcp", "version": "1.0.0"}}}
+2025-06-25 16:39:03,536 - __main__ - INFO - 📤 Sending response: {"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "forestrat-mcp", "version": "1.0.0"}}}
