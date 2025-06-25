@@ -24,6 +24,52 @@ from config import Config
 config = Config()
 TABLE_MAPPINGS = config.DATASET_MAPPING
 
+# Predefined symbol categories for efficient queries
+SYMBOL_CATEGORIES = {
+    "bitcoin_futures": {
+        "symbols": ["MBTF25", "BTCF25", "MBTG25", "BTCG25"],
+        "description": "Bitcoin futures contracts",
+        "exchanges": ["CME"],
+        "keywords": ["bitcoin", "btc", "futures"]
+    },
+    "ethereum_futures": {
+        "symbols": ["HTEF25", "ETEF25", "MTEF25", "ETEG25"],
+        "description": "Ethereum futures contracts", 
+        "exchanges": ["CME"],
+        "keywords": ["ethereum", "eth", "futures"]
+    },
+    "crypto_futures": {
+        "symbols": ["MBTF25", "BTCF25", "MBTG25", "BTCG25", "HTEF25", "ETEF25", "MTEF25", "ETEG25"],
+        "description": "All cryptocurrency futures contracts",
+        "exchanges": ["CME"],
+        "keywords": ["crypto", "cryptocurrency", "futures", "digital", "assets"]
+    },
+    "micro_bitcoin": {
+        "symbols": ["MBTF25", "MBTG25"],
+        "description": "Micro Bitcoin futures (smaller contract sizes)",
+        "exchanges": ["CME"],
+        "keywords": ["micro", "bitcoin", "mbt"]
+    },
+    "standard_bitcoin": {
+        "symbols": ["BTCF25", "BTCG25"],
+        "description": "Standard Bitcoin futures (full contract sizes)",
+        "exchanges": ["CME"],
+        "keywords": ["standard", "bitcoin", "btc", "full"]
+    },
+    "micro_ethereum": {
+        "symbols": ["HTEF25", "MTEF25"],
+        "description": "Micro Ethereum futures (smaller contract sizes)",
+        "exchanges": ["CME"],
+        "keywords": ["micro", "ethereum", "hte", "mte"]
+    },
+    "standard_ethereum": {
+        "symbols": ["ETEF25", "ETEG25"],
+        "description": "Standard Ethereum futures (full contract sizes)",
+        "exchanges": ["CME"],
+        "keywords": ["standard", "ethereum", "ete", "full"]
+    }
+}
+
 # Configure logging
 import os
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forestrat_mcp_server.log')
@@ -274,6 +320,65 @@ class ForestratMCPServer:
                     "required": ["date", "exchange"],
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "get_symbols_by_category",
+                "description": "Get predefined symbol lists by category (e.g., bitcoin_futures, ethereum_futures) for efficient queries without expensive LIKE operations",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": ["bitcoin_futures", "ethereum_futures", "crypto_futures", "micro_bitcoin", "standard_bitcoin", "micro_ethereum", "standard_ethereum"],
+                            "description": "Symbol category to retrieve"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange to filter by (optional)"
+                        },
+                        "include_stats": {
+                            "type": "boolean",
+                            "description": "Include trading statistics for the symbols (default: false)"
+                        },
+                        "date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Date for statistics (required if include_stats is true)"
+                        }
+                    },
+                    "required": ["category"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_category_volume_data",
+                "description": "Get volume and trading data for a specific symbol category (optimized for queries like 'bitcoin futures volume')",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": ["bitcoin_futures", "ethereum_futures", "crypto_futures", "micro_bitcoin", "standard_bitcoin", "micro_ethereum", "standard_ethereum"],
+                            "description": "Symbol category to analyze"
+                        },
+                        "date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Date to analyze (YYYY-MM-DD)"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange name (LSE, CME, NYQ)"
+                        },
+                        "metric": {
+                            "type": "string",
+                            "enum": ["volume", "trade_count", "both"],
+                            "description": "Metric to retrieve (default: both)"
+                        }
+                    },
+                    "required": ["category", "date", "exchange"],
+                    "additionalProperties": False
+                }
             }
         ]
         
@@ -457,6 +562,12 @@ class ForestratMCPServer:
                 "name": "Database Overview",
                 "description": "High-level statistics about the entire database",
                 "mimeType": "application/json"
+            },
+            {
+                "uri": "forestrat://categories/symbol_categories",
+                "name": "Symbol Categories",
+                "description": "Predefined symbol categories for efficient queries (e.g., bitcoin_futures, ethereum_futures)",
+                "mimeType": "application/json"
             }
         ]
         
@@ -514,6 +625,8 @@ class ForestratMCPServer:
                 return await self._read_data_quality_resource(request_id)
             elif uri == "forestrat://stats/database_overview":
                 return await self._read_database_overview_resource(request_id)
+            elif uri == "forestrat://categories/symbol_categories":
+                return await self._read_symbol_categories_resource(request_id)
             else:
                 return self.create_error(request_id, -32602, f"Unknown resource URI: {uri}")
                 
@@ -572,6 +685,20 @@ class ForestratMCPServer:
                     arguments["exchange"],
                     arguments.get("metric", "trade_count"),
                     arguments.get("limit", 10)
+                )
+            elif name == "get_symbols_by_category":
+                result = await self._get_symbols_by_category(
+                    arguments["category"],
+                    arguments.get("exchange"),
+                    arguments.get("include_stats", False),
+                    arguments.get("date")
+                )
+            elif name == "get_category_volume_data":
+                result = await self._get_category_volume_data(
+                    arguments["category"],
+                    arguments["date"],
+                    arguments["exchange"],
+                    arguments.get("metric", "both")
                 )
             else:
                 logger.error(f"❌ Unknown tool requested: {name}")
@@ -1138,6 +1265,213 @@ class ForestratMCPServer:
             
         except Exception as e:
             logger.error(f"Error getting least active symbols: {e}")
+            return {"error": str(e)}
+
+    async def _get_symbols_by_category(
+        self, 
+        category: str, 
+        exchange: Optional[str] = None,
+        include_stats: bool = False,
+        date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get predefined symbol lists by category for efficient queries"""
+        try:
+            if category not in SYMBOL_CATEGORIES:
+                return {
+                    "error": f"Unknown category: {category}",
+                    "available_categories": list(SYMBOL_CATEGORIES.keys())
+                }
+            
+            category_info = SYMBOL_CATEGORIES[category]
+            symbols = category_info["symbols"]
+            
+            # Filter by exchange if specified
+            if exchange:
+                exchange = exchange.upper()
+                if exchange not in category_info["exchanges"]:
+                    return {
+                        "category": category,
+                        "exchange": exchange,
+                        "error": f"Category {category} not available on exchange {exchange}",
+                        "available_exchanges": category_info["exchanges"],
+                        "symbols": []
+                    }
+            
+            result = {
+                "category": category,
+                "description": category_info["description"],
+                "symbols": symbols,
+                "symbol_count": len(symbols),
+                "exchanges": category_info["exchanges"],
+                "keywords": category_info["keywords"]
+            }
+            
+            # Add statistics if requested
+            if include_stats and date:
+                if not exchange:
+                    exchange = category_info["exchanges"][0]  # Use first available exchange
+                
+                table_mapping = {
+                    'LSE': 'bronze.lse_market_data_raw',
+                    'CME': 'bronze.cme_market_data_raw',
+                    'NYQ': 'bronze.nyq_market_data_raw'
+                }
+                
+                table_name = table_mapping.get(exchange)
+                if table_name and self.db.table_exists(table_name):
+                    # Build IN clause for symbols
+                    symbol_list = "', '".join(symbols)
+                    
+                    stats_query = f"""
+                    SELECT 
+                        "#RIC" as symbol,
+                        COUNT(*) as trade_count,
+                        SUM(CASE WHEN Volume ~ '^[0-9]+$' THEN CAST(Volume AS INTEGER) ELSE 0 END) as total_volume,
+                        AVG(Price) as avg_price,
+                        MIN(Price) as min_price,
+                        MAX(Price) as max_price,
+                        STDDEV(Price) as price_volatility
+                    FROM {table_name}
+                    WHERE data_date = '{date}'
+                    AND "#RIC" IN ('{symbol_list}')
+                    GROUP BY "#RIC"
+                    ORDER BY total_volume DESC
+                    """
+                    
+                    try:
+                        stats_df = self.db.execute_query(stats_query)
+                        result["statistics"] = {
+                            "date": date,
+                            "exchange": exchange,
+                            "symbol_stats": stats_df.to_dict('records')
+                        }
+                    except Exception as e:
+                        result["statistics_error"] = str(e)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting symbols by category: {e}")
+            return {"error": str(e)}
+
+    async def _get_category_volume_data(
+        self, 
+        category: str, 
+        date: str, 
+        exchange: str,
+        metric: str = "both"
+    ) -> Dict[str, Any]:
+        """Get volume and trading data for a specific symbol category (optimized query)"""
+        try:
+            if category not in SYMBOL_CATEGORIES:
+                return {
+                    "error": f"Unknown category: {category}",
+                    "available_categories": list(SYMBOL_CATEGORIES.keys())
+                }
+            
+            category_info = SYMBOL_CATEGORIES[category]
+            symbols = category_info["symbols"]
+            
+            # Check if exchange is supported for this category
+            exchange = exchange.upper()
+            if exchange not in category_info["exchanges"]:
+                return {
+                    "category": category,
+                    "date": date,
+                    "exchange": exchange,
+                    "error": f"Category {category} not available on exchange {exchange}",
+                    "available_exchanges": category_info["exchanges"]
+                }
+            
+            table_mapping = {
+                'LSE': 'bronze.lse_market_data_raw',
+                'CME': 'bronze.cme_market_data_raw',
+                'NYQ': 'bronze.nyq_market_data_raw'
+            }
+            
+            table_name = table_mapping.get(exchange)
+            if not table_name:
+                return {
+                    "error": f"No table found for exchange {exchange}",
+                    "available_exchanges": list(table_mapping.keys())
+                }
+            
+            if not self.db.table_exists(table_name):
+                return {
+                    "error": f"Table {table_name} does not exist"
+                }
+            
+            # Build optimized query using IN clause instead of LIKE
+            symbol_list = "', '".join(symbols)
+            
+            # Check column types to handle data type differences
+            columns = self.db.get_table_columns(table_name)
+            
+            # Build appropriate volume expression
+            if columns.get('Volume') in ['BIGINT', 'INTEGER', 'DOUBLE']:
+                volume_expr = "SUM(Volume) as total_volume"
+                volume_available = True
+            else:
+                volume_expr = "0 as total_volume"
+                volume_available = False
+            
+            if metric == "volume" and not volume_available:
+                metric = "trade_count"  # Fallback if volume not available
+            
+            query = f"""
+            SELECT 
+                "#RIC" as symbol,
+                COUNT(*) as trade_count,
+                {volume_expr},
+                AVG(Price) as avg_price,
+                MIN(Price) as min_price,
+                MAX(Price) as max_price,
+                STDDEV(Price) as price_volatility,
+                MIN("Date-Time") as first_trade,
+                MAX("Date-Time") as last_trade
+            FROM {table_name}
+            WHERE data_date = '{date}'
+            AND "#RIC" IN ('{symbol_list}')
+            GROUP BY "#RIC"
+            ORDER BY 
+                CASE 
+                    WHEN '{metric}' = 'volume' THEN total_volume
+                    ELSE trade_count
+                END DESC
+            """
+            
+            result_df = self.db.execute_query(query)
+            
+            # Calculate category totals
+            if not result_df.empty:
+                total_trades = result_df['trade_count'].sum()
+                total_volume = result_df['total_volume'].sum() if volume_available else 0
+                avg_price_weighted = (result_df['avg_price'] * result_df['trade_count']).sum() / total_trades if total_trades > 0 else 0
+                symbols_active = len(result_df)
+            else:
+                total_trades = total_volume = avg_price_weighted = symbols_active = 0
+            
+            return {
+                "category": category,
+                "description": category_info["description"],
+                "date": date,
+                "exchange": exchange,
+                "metric": metric,
+                "query_optimization": f"Used IN clause with {len(symbols)} predefined symbols (no LIKE scan)",
+                "category_totals": {
+                    "symbols_in_category": len(symbols),
+                    "symbols_active": symbols_active,
+                    "total_trades": int(total_trades),
+                    "total_volume": int(total_volume) if volume_available else "N/A",
+                    "weighted_avg_price": round(avg_price_weighted, 4) if avg_price_weighted else 0
+                },
+                "symbol_data": result_df.to_dict('records'),
+                "volume_data_available": volume_available,
+                "note": f"Efficient query using predefined symbol list for {category}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting category volume data: {e}")
             return {"error": str(e)}
 
     def _resolve_table_name(self, dataset: str) -> str:
@@ -1715,6 +2049,56 @@ class ForestratMCPServer:
             
         except Exception as e:
             return self.create_error(request_id, -32603, f"Error reading database overview: {str(e)}")
+
+    async def _read_symbol_categories_resource(self, request_id: Any) -> Dict[str, Any]:
+        """Read symbol categories resource"""
+        try:
+            content = {
+                "symbol_categories": SYMBOL_CATEGORIES,
+                "usage_examples": {
+                    "get_bitcoin_futures": {
+                        "tool": "get_symbols_by_category",
+                        "arguments": {"category": "bitcoin_futures"}
+                    },
+                    "get_bitcoin_volume_data": {
+                        "tool": "get_category_volume_data", 
+                        "arguments": {
+                            "category": "bitcoin_futures",
+                            "date": "2025-01-17",
+                            "exchange": "CME"
+                        }
+                    },
+                    "get_crypto_futures_with_stats": {
+                        "tool": "get_symbols_by_category",
+                        "arguments": {
+                            "category": "crypto_futures",
+                            "include_stats": True,
+                            "date": "2025-01-17",
+                            "exchange": "CME"
+                        }
+                    }
+                },
+                "performance_benefits": [
+                    "Uses IN clause instead of expensive LIKE '%' queries",
+                    "Predefined symbol lists avoid table scans",
+                    "Optimized for common cryptocurrency futures queries",
+                    "Faster response times for category-based analysis"
+                ],
+                "generated_at": datetime.now().isoformat()
+            }
+            
+            return self.create_response(request_id, {
+                "contents": [
+                    {
+                        "uri": "forestrat://categories/symbol_categories",
+                        "mimeType": "application/json",
+                        "text": json.dumps(content, indent=2)
+                    }
+                ]
+            })
+            
+        except Exception as e:
+            return self.create_error(request_id, -32603, f"Error reading symbol categories: {str(e)}")
 
 async def main():
     """Main entry point"""
