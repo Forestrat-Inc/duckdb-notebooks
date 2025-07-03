@@ -1,0 +1,57 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Log files
+*.log
+logs/
+forestrat_mcp_server.log
+
+# Test files
+test_*.py
+*_test.py
+
+# Documentation
+*.md
+README*
+
+# Shell scripts
+*.sh
+
+# Development files
+main.py
+main_backup.py
+main_with_activity.py
+server.py
+example_client.py
+test_*.py
+
+# Output files
+combined_output.txt
+server.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml 

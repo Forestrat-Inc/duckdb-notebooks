@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  forestrat-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forestrat-mcp-server
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - DATABASE_PATH=/app/data/multi_exchange_data_lake.duckdb
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    
+    # Volume mounts
+    volumes:
+      # Mount the DuckDB database file
+      - ../multi_exchange_data_lake.duckdb:/app/data/multi_exchange_data_lake.duckdb:ro
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+      # Optional: Mount config for easy updates
+      - ./config.py:/app/config.py:ro
+    
+    # For stdio communication (default MCP mode)
+    stdin_open: true
+    tty: true
+    
+    # Optional: Network mode for TCP communication
+    # ports:
+    #   - "8080:8080"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "from database import DuckDBConnection; import os; db = DuckDBConnection(os.getenv('DATABASE_PATH')); print('healthy' if db.test_connection() else exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Optional: Development service with more mounts
+  forestrat-mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forestrat-mcp-dev
+    restart: "no"
+    profiles:
+      - dev
+    
+    environment:
+      - DATABASE_PATH=/app/data/multi_exchange_data_lake.duckdb
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+    
+    volumes:
+      # Mount source code for development
+      - ./main_fixed.py:/app/main_fixed.py
+      - ./config.py:/app/config.py
+      - ./database.py:/app/database.py
+      # Mount database (read-write for dev)
+      - ../multi_exchange_data_lake.duckdb:/app/data/multi_exchange_data_lake.duckdb
+      # Mount logs
+      - ./logs:/app/logs
+    
+    stdin_open: true
+    tty: true 
