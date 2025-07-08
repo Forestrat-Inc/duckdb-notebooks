@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- 
+  NiFi Flow Template: Supabase Integration Test
+  
+  This template creates a simple flow to test the Supabase-integrated load_january_simple.py script.
+  
+  To use:
+  1. Import this template in NiFi
+  2. Update the ExecuteScript processor with your script path
+  3. Ensure Python dependencies are installed
+  4. Start the flow
+-->
+<template encoding-version="1.2">
+    <description>Test flow for Supabase-integrated market data loading</description>
+    <groupId>supabase-test</groupId>
+    <name>Supabase Market Data Loader Test</name>
+    <snippet>
+        <processors>
+            <!-- Generate a trigger flow file -->
+            <processor>
+                <id>generate-trigger</id>
+                <name>GenerateFlowFile - Trigger</name>
+                <type>org.apache.nifi.processors.standard.GenerateFlowFile</type>
+                <state>STOPPED</state>
+                <properties>
+                    <property>
+                        <name>File Size</name>
+                        <value>0B</value>
+                    </property>
+                    <property>
+                        <name>Batch Size</name>
+                        <value>1</value>
+                    </property>
+                    <property>
+                        <name>Data Format</name>
+                        <value>Text</value>
+                    </property>
+                    <property>
+                        <name>Unique FlowFiles</name>
+                        <value>false</value>
+                    </property>
+                    <property>
+                        <name>Custom Text</name>
+                        <value>trigger</value>
+                    </property>
+                </properties>
+                <autoTerminatedRelationships>
+                </autoTerminatedRelationships>
+                <schedulingPeriod>30 sec</schedulingPeriod>
+                <schedulingStrategy>TIMER_DRIVEN</schedulingStrategy>
+                <executionNode>ALL</executionNode>
+                <penaltyDuration>30 sec</penaltyDuration>
+                <yieldDuration>1 sec</yieldDuration>
+                <bulletinLevel>WARN</bulletinLevel>
+                <runDurationMillis>0</runDurationMillis>
+                <concurrentlySchedulableTaskCount>1</concurrentlySchedulableTaskCount>
+            </processor>
+
+            <!-- Set date attribute -->
+            <processor>
+                <id>set-date</id>
+                <name>UpdateAttribute - Set Date</name>
+                <type>org.apache.nifi.processors.attributes.UpdateAttribute</type>
+                <state>STOPPED</state>
+                <properties>
+                    <property>
+                        <name>date</name>
+                        <value>${now():format('yyyy-MM-dd')}</value>
+                    </property>
+                    <property>
+                        <name>exchange</name>
+                        <value>LSE</value>
+                    </property>
+                    <property>
+                        <name>script.args</name>
+                        <value>--date ${date} --exchanges ${exchange} --idempotent</value>
+                    </property>
+                </properties>
+                <autoTerminatedRelationships>
+                </autoTerminatedRelationships>
+                <schedulingPeriod>0 sec</schedulingPeriod>
+                <schedulingStrategy>TIMER_DRIVEN</schedulingStrategy>
+                <executionNode>ALL</executionNode>
+                <penaltyDuration>30 sec</penaltyDuration>
+                <yieldDuration>1 sec</yieldDuration>
+                <bulletinLevel>WARN</bulletinLevel>
+                <runDurationMillis>0</runDurationMillis>
+                <concurrentlySchedulableTaskCount>1</concurrentlySchedulableTaskCount>
+            </processor>
+
+            <!-- Execute the Python script -->
+            <processor>
+                <id>execute-script</id>
+                <name>ExecuteScript - Load Data</name>
+                <type>org.apache.nifi.processors.script.ExecuteScript</type>
+                <state>STOPPED</state>
+                <properties>
+                    <property>
+                        <name>Script Engine</name>
+                        <value>python</value>
+                    </property>
+                    <property>
+                        <name>Script File</name>
+                        <value>/opt/nifi/scripts/load_january_simple.py</value>
+                    </property>
+                    <property>
+                        <name>Script Arguments</name>
+                        <value>${script.args}</value>
+                    </property>
+                    <property>
+                        <name>Module Directory</name>
+                        <value>/opt/nifi/scripts</value>
+                    </property>
+                </properties>
+                <autoTerminatedRelationships>
+                    <relationship>failure</relationship>
+                </autoTerminatedRelationships>
+                <schedulingPeriod>0 sec</schedulingPeriod>
+                <schedulingStrategy>TIMER_DRIVEN</schedulingStrategy>
+                <executionNode>ALL</executionNode>
+                <penaltyDuration>30 sec</penaltyDuration>
+                <yieldDuration>1 sec</yieldDuration>
+                <bulletinLevel>WARN</bulletinLevel>
+                <runDurationMillis>0</runDurationMillis>
+                <concurrentlySchedulableTaskCount>1</concurrentlySchedulableTaskCount>
+            </processor>
+
+            <!-- Log the results -->
+            <processor>
+                <id>log-results</id>
+                <name>LogAttribute - Results</name>
+                <type>org.apache.nifi.processors.standard.LogAttribute</type>
+                <state>STOPPED</state>
+                <properties>
+                    <property>
+                        <name>Log Level</name>
+                        <value>info</value>
+                    </property>
+                    <property>
+                        <name>Log Payload</name>
+                        <value>false</value>
+                    </property>
+                    <property>
+                        <name>Attributes to Log</name>
+                        <value>date,exchange,script.args</value>
+                    </property>
+                    <property>
+                        <name>Attributes to Log Regex</name>
+                        <value></value>
+                    </property>
+                    <property>
+                        <name>Log prefix</name>
+                        <value>Market Data Load Result:</value>
+                    </property>
+                </properties>
+                <autoTerminatedRelationships>
+                    <relationship>success</relationship>
+                </autoTerminatedRelationships>
+                <schedulingPeriod>0 sec</schedulingPeriod>
+                <schedulingStrategy>TIMER_DRIVEN</schedulingStrategy>
+                <executionNode>ALL</executionNode>
+                <penaltyDuration>30 sec</penaltyDuration>
+                <yieldDuration>1 sec</yieldDuration>
+                <bulletinLevel>WARN</bulletinLevel>
+                <runDurationMillis>0</runDurationMillis>
+                <concurrentlySchedulableTaskCount>1</concurrentlySchedulableTaskCount>
+            </processor>
+        </processors>
+
+        <connections>
+            <!-- GenerateFlowFile -> UpdateAttribute -->
+            <connection>
+                <id>conn1</id>
+                <name></name>
+                <source>
+                    <id>generate-trigger</id>
+                    <groupId></groupId>
+                    <type>PROCESSOR</type>
+                </source>
+                <destination>
+                    <id>set-date</id>
+                    <groupId></groupId>
+                    <type>PROCESSOR</type>
+                </destination>
+                <relationship>success</relationship>
+                <maxWorkQueueSize>1000</maxWorkQueueSize>
+                <maxWorkQueueDataSize>1 GB</maxWorkQueueDataSize>
+                <flowFileExpiration>0 sec</flowFileExpiration>
+                <backPressureObjectThreshold>10000</backPressureObjectThreshold>
+                <backPressureDataSizeThreshold>1 GB</backPressureDataSizeThreshold>
+            </connection>
+
+            <!-- UpdateAttribute -> ExecuteScript -->
+            <connection>
+                <id>conn2</id>
+                <name></name>
+                <source>
+                    <id>set-date</id>
+                    <groupId></groupId>
+                    <type>PROCESSOR</type>
+                </source>
+                <destination>
+                    <id>execute-script</id>
+                    <groupId></groupId>
+                    <type>PROCESSOR</type>
+                </destination>
+                <relationship>success</relationship>
+                <maxWorkQueueSize>1000</maxWorkQueueSize>
+                <maxWorkQueueDataSize>1 GB</maxWorkQueueDataSize>
+                <flowFileExpiration>0 sec</flowFileExpiration>
+                <backPressureObjectThreshold>10000</backPressureObjectThreshold>
+                <backPressureDataSizeThreshold>1 GB</backPressureDataSizeThreshold>
+            </connection>
+
+            <!-- ExecuteScript -> LogAttribute -->
+            <connection>
+                <id>conn3</id>
+                <name></name>
+                <source>
+                    <id>execute-script</id>
+                    <groupId></groupId>
+                    <type>PROCESSOR</type>
+                </source>
+                <destination>
+                    <id>log-results</id>
+                    <groupId></groupId>
+                    <type>PROCESSOR</type>
+                </destination>
+                <relationship>success</relationship>
+                <maxWorkQueueSize>1000</maxWorkQueueSize>
+                <maxWorkQueueDataSize>1 GB</maxWorkQueueDataSize>
+                <flowFileExpiration>0 sec</flowFileExpiration>
+                <backPressureObjectThreshold>10000</backPressureObjectThreshold>
+                <backPressureDataSizeThreshold>1 GB</backPressureDataSizeThreshold>
+            </connection>
+        </connections>
+    </snippet>
+</template> 

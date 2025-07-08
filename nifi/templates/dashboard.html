@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>January 2025 Data Loading Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .status-card {
+            transition: transform 0.2s;
+        }
+        .status-card:hover {
+            transform: translateY(-5px);
+        }
+        .status-running {
+            border-left: 4px solid #28a745;
+        }
+        .status-stopped {
+            border-left: 4px solid #dc3545;
+        }
+        .status-shutdown {
+            border-left: 4px solid #ffc107;
+        }
+        .progress-bar-animated {
+            animation: progress-bar-stripes 1s linear infinite;
+        }
+        .last-updated {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        .error-row {
+            background-color: #fff5f5;
+        }
+        .control-panel {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .exchange-badge {
+            font-size: 0.875rem;
+            padding: 0.375rem 0.75rem;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 2rem;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .pulsing {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-0">
+                        <i class="bi bi-graph-up"></i>
+                        January 2025 Data Loading Dashboard
+                    </h1>
+                    <p class="mb-0 mt-2">Real-time monitoring of market data loading progress</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex justify-content-end align-items-center">
+                        <div class="me-3">
+                            <small class="last-updated" id="lastUpdated">Last updated: Loading...</small>
+                        </div>
+                        <div class="spinner-border spinner-border-sm text-light" role="status" id="loadingSpinner">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="mb-1">
+                        <i class="bi bi-gear"></i>
+                        Control Panel
+                    </h4>
+                    <p class="mb-0">Manage the data loading process</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <form method="POST" style="display: inline;">
+                        <button type="submit" formaction="{{ url_for('control_shutdown') }}" 
+                                class="btn btn-outline-light me-2" id="shutdownBtn">
+                            <i class="bi bi-stop-circle"></i> Shutdown
+                        </button>
+                        <button type="submit" formaction="{{ url_for('control_resume') }}" 
+                                class="btn btn-light" id="resumeBtn">
+                            <i class="bi bi-play-circle"></i> Resume
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card metric-card status-card" id="statusCard">
+                    <div class="card-body text-center">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <i class="bi bi-activity text-primary" style="font-size: 2rem;"></i>
+                            </div>
+                            <span class="badge bg-secondary" id="statusBadge">Loading...</span>
+                        </div>
+                        <h4 class="mt-2 mb-0" id="statusText">Checking...</h4>
+                        <small class="text-muted">System Status</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-files text-success" style="font-size: 2rem;"></i>
+                        <h4 class="mt-2 mb-0" id="totalFiles">0</h4>
+                        <small class="text-muted">Total Files</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                        <h4 class="mt-2 mb-0" id="completedFiles">0</h4>
+                        <small class="text-muted">Completed</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-database text-info" style="font-size: 2rem;"></i>
+                        <h4 class="mt-2 mb-0" id="totalRecords">0</h4>
+                        <small class="text-muted">Total Records</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exchange Progress -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-bar-chart"></i>
+                            Exchange Progress
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="exchangeProgress">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading exchange data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Chart -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-graph-up"></i>
+                            Daily Progress Chart
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="progressChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history"></i>
+                            Recent Activity
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Exchange</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Records</th>
+                                        <th>Duration</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentActivity">
+                                    <tr>
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Error Summary
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="errorSummary">
+                            <div class="text-center">
+                                <div class="spinner-border text-warning" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pie-chart"></i>
+                            Performance Statistics
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="performanceStats">
+                            <div class="col-12 text-center">
+                                <div class="spinner-border text-info" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading statistics...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables
+        let progressChart = null;
+        let refreshInterval = null;
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            startAutoRefresh();
+        });
+        
+        // Auto-refresh every 5 seconds
+        function startAutoRefresh() {
+            refreshInterval = setInterval(refreshData, 5000);
+        }
+        
+        // Main refresh function
+        async function refreshData() {
+            try {
+                showLoadingSpinner();
+                await Promise.all([
+                    updateOverview(),
+                    updateProgressDetail(),
+                    updateErrors(),
+                    updateStatistics()
+                ]);
+                hideLoadingSpinner();
+                updateLastUpdated();
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                hideLoadingSpinner();
+            }
+        }
+        
+        // Update overview section
+        async function updateOverview() {
+            try {
+                const response = await fetch('/api/overview');
+                const data = await response.json();
+                
+                // Update status
+                updateSystemStatus(data.is_running, data.shutdown_requested);
+                
+                // Update metrics
+                let totalFiles = 0, completedFiles = 0, totalRecords = 0;
+                
+                data.overview.forEach(exchange => {
+                    totalFiles += exchange.total_files || 0;
+                    completedFiles += exchange.completed_files || 0;
+                    totalRecords += exchange.total_records || 0;
+                });
+                
+                document.getElementById('totalFiles').textContent = totalFiles.toLocaleString();
+                document.getElementById('completedFiles').textContent = completedFiles.toLocaleString();
+                document.getElementById('totalRecords').textContent = totalRecords.toLocaleString();
+                
+                // Update exchange progress
+                updateExchangeProgress(data.overview);
+                
+            } catch (error) {
+                console.error('Error updating overview:', error);
+            }
+        }
+        
+        // Update system status
+        function updateSystemStatus(isRunning, shutdownRequested) {
+            const statusCard = document.getElementById('statusCard');
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+            
+            statusCard.className = 'card metric-card status-card';
+            
+            if (shutdownRequested) {
+                statusCard.classList.add('status-shutdown');
+                statusBadge.className = 'badge bg-warning';
+                statusBadge.textContent = 'Shutdown Requested';
+                statusText.textContent = 'Stopping...';
+                statusText.classList.add('pulsing');
+            } else if (isRunning) {
+                statusCard.classList.add('status-running');
+                statusBadge.className = 'badge bg-success';
+                statusBadge.textContent = 'Running';
+                statusText.textContent = 'Active';
+                statusText.classList.add('pulsing');
+            } else {
+                statusCard.classList.add('status-stopped');
+                statusBadge.className = 'badge bg-secondary';
+                statusBadge.textContent = 'Stopped';
+                statusText.textContent = 'Idle';
+                statusText.classList.remove('pulsing');
+            }
+        }
+        
+        // Update exchange progress
+        function updateExchangeProgress(exchanges) {
+            const container = document.getElementById('exchangeProgress');
+            
+            if (exchanges.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center">No data available</p>';
+                return;
+            }
+            
+            let html = '';
+            exchanges.forEach(exchange => {
+                const progress = exchange.total_files > 0 ? 
+                    (exchange.completed_files / exchange.total_files * 100).toFixed(1) : 0;
+                
+                html += `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge exchange-badge bg-primary">${exchange.exchange}</span>
+                            <small class="text-muted">
+                                ${exchange.completed_files || 0}/${exchange.total_files || 0} files
+                                (${(exchange.total_records || 0).toLocaleString()} records)
+                            </small>
+                        </div>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar ${exchange.running_files > 0 ? 'progress-bar-striped progress-bar-animated' : ''}" 
+                                 role="progressbar" 
+                                 style="width: ${progress}%"
+                                 aria-valuenow="${progress}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                ${progress}%
+                            </div>
+                        </div>
+                        ${exchange.failed_files > 0 ? 
+                            `<small class="text-danger mt-1 d-block">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                ${exchange.failed_files} failed
+                            </small>` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Update progress detail
+        async function updateProgressDetail() {
+            try {
+                const response = await fetch('/api/progress_detail');
+                const data = await response.json();
+                
+                // Update recent activity table
+                updateRecentActivity(data.recent_progress);
+                
+                // Update progress chart
+                updateProgressChart(data.daily_chart_data);
+                
+            } catch (error) {
+                console.error('Error updating progress detail:', error);
+            }
+        }
+        
+        // Update recent activity table
+        function updateRecentActivity(activities) {
+            const tbody = document.getElementById('recentActivity');
+            
+            if (activities.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No recent activity</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            activities.slice(0, 10).forEach(activity => {
+                const statusClass = activity.status === 'completed' ? 'success' : 
+                                   activity.status === 'failed' ? 'danger' : 'warning';
+                const statusIcon = activity.status === 'completed' ? 'check-circle' : 
+                                  activity.status === 'failed' ? 'x-circle' : 'clock';
+                
+                html += `
+                    <tr ${activity.status === 'failed' ? 'class="error-row"' : ''}>
+                        <td>
+                            <span class="badge bg-primary">${activity.exchange}</span>
+                        </td>
+                        <td>${activity.data_date}</td>
+                        <td>
+                            <span class="badge bg-${statusClass}">
+                                <i class="bi bi-${statusIcon}"></i>
+                                ${activity.status}
+                            </span>
+                        </td>
+                        <td>${(activity.records_loaded || 0).toLocaleString()}</td>
+                        <td>${activity.processing_time_seconds ? activity.processing_time_seconds + 's' : '-'}</td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+        
+        // Update progress chart
+        function updateProgressChart(chartData) {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            
+            if (progressChart) {
+                progressChart.destroy();
+            }
+            
+            if (chartData.length === 0) {
+                return;
+            }
+            
+            // Group data by exchange
+            const exchanges = [...new Set(chartData.map(d => d.exchange))];
+            const dates = [...new Set(chartData.map(d => d.stats_date))].sort();
+            
+            const datasets = exchanges.map((exchange, index) => {
+                const colors = ['#667eea', '#764ba2', '#f093fb'];
+                const data = dates.map(date => {
+                    const item = chartData.find(d => d.exchange === exchange && d.stats_date === date);
+                    return item ? item.successful_files : 0;
+                });
+                
+                return {
+                    label: exchange,
+                    data: data,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '20',
+                    fill: false,
+                    tension: 0.1
+                };
+            });
+            
+            progressChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Daily Files Processed by Exchange'
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Files Processed'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update errors section
+        async function updateErrors() {
+            try {
+                const response = await fetch('/api/errors');
+                const data = await response.json();
+                
+                updateErrorSummary(data.error_summary);
+                
+            } catch (error) {
+                console.error('Error updating errors:', error);
+            }
+        }
+        
+        // Update error summary
+        function updateErrorSummary(errorSummary) {
+            const container = document.getElementById('errorSummary');
+            
+            if (errorSummary.length === 0) {
+                container.innerHTML = '<p class="text-success text-center mb-0"><i class="bi bi-check-circle"></i> No errors</p>';
+                return;
+            }
+            
+            let html = '';
+            errorSummary.forEach(error => {
+                html += `
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                        <div>
+                            <span class="badge bg-primary">${error.exchange}</span>
+                        </div>
+                        <div class="text-end">
+                            <div class="text-danger fw-bold">${error.error_count}</div>
+                            <small class="text-muted">${error.error_days} days</small>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Update statistics
+        async function updateStatistics() {
+            try {
+                const response = await fetch('/api/statistics');
+                const data = await response.json();
+                
+                updatePerformanceStats(data.performance_metrics);
+                
+            } catch (error) {
+                console.error('Error updating statistics:', error);
+            }
+        }
+        
+        // Update performance statistics
+        function updatePerformanceStats(performanceMetrics) {
+            const container = document.getElementById('performanceStats');
+            
+            if (performanceMetrics.length === 0) {
+                container.innerHTML = '<div class="col-12 text-center text-muted">No performance data available</div>';
+                return;
+            }
+            
+            let html = '';
+            performanceMetrics.forEach(metric => {
+                html += `
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">
+                                    <span class="badge bg-primary">${metric.exchange}</span>
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="text-primary fw-bold">${Math.round(metric.avg_records_per_file || 0).toLocaleString()}</div>
+                                        <small class="text-muted">Avg Records/File</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-success fw-bold">${(metric.avg_processing_time || 0).toFixed(1)}s</div>
+                                        <small class="text-muted">Avg Time</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Utility functions
+        function showLoadingSpinner() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+        }
+        
+        function hideLoadingSpinner() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+        
+        function updateLastUpdated() {
+            const now = new Date();
+            document.getElementById('lastUpdated').textContent = 
+                `Last updated: ${now.toLocaleTimeString()}`;
+        }
+        
+        // Handle page visibility change
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Pause auto-refresh when page is hidden
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                }
+            } else {
+                // Resume auto-refresh when page becomes visible
+                refreshData();
+                startAutoRefresh();
+            }
+        });
+        
+        // Handle errors
+        window.addEventListener('error', function(e) {
+            console.error('Dashboard error:', e.error);
+        });
+    </script>
+</body>
+</html> 

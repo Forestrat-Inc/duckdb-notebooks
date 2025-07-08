@@ -379,6 +379,45 @@ class ForestratMCPServer:
                     "required": ["category", "date", "exchange"],
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "export_category_data",
+                "description": "Export all data for a specific futures category to a CSV file",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": ["bitcoin_futures", "ethereum_futures", "crypto_futures", "micro_bitcoin", "standard_bitcoin", "micro_ethereum", "standard_ethereum"],
+                            "description": "Symbol category to export"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange name (LSE, CME, NYQ)"
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start date for data export (YYYY-MM-DD, optional)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End date for data export (YYYY-MM-DD, optional)"
+                        },
+                        "output_filename": {
+                            "type": "string",
+                            "description": "Output filename (optional, will auto-generate if not provided)"
+                        },
+                        "format": {
+                            "type": "string",
+                            "enum": ["csv", "json"],
+                            "description": "Export format (default: csv)"
+                        }
+                    },
+                    "required": ["category", "exchange"],
+                    "additionalProperties": False
+                }
             }
         ]
         
@@ -699,6 +738,15 @@ class ForestratMCPServer:
                     arguments["date"],
                     arguments["exchange"],
                     arguments.get("metric", "both")
+                )
+            elif name == "export_category_data":
+                result = await self._export_category_data(
+                    arguments["category"],
+                    arguments["exchange"],
+                    arguments.get("start_date"),
+                    arguments.get("end_date"),
+                    arguments.get("output_filename"),
+                    arguments.get("format")
                 )
             else:
                 logger.error(f"❌ Unknown tool requested: {name}")
@@ -2099,6 +2147,171 @@ class ForestratMCPServer:
             
         except Exception as e:
             return self.create_error(request_id, -32603, f"Error reading symbol categories: {str(e)}")
+
+    async def _export_category_data(
+        self, 
+        category: str, 
+        exchange: str, 
+        start_date: Optional[str] = None, 
+        end_date: Optional[str] = None, 
+        output_filename: Optional[str] = None,
+        format: Optional[str] = "csv"
+    ) -> Dict[str, Any]:
+        """Export all data for a specific futures category to a file"""
+        try:
+            import os
+            import pandas as pd
+            from datetime import datetime as dt
+            
+            if category not in SYMBOL_CATEGORIES:
+                return {
+                    "error": f"Unknown category: {category}",
+                    "available_categories": list(SYMBOL_CATEGORIES.keys())
+                }
+            
+            category_info = SYMBOL_CATEGORIES[category]
+            symbols = category_info["symbols"]
+            
+            # Check if exchange is supported for this category
+            exchange = exchange.upper()
+            if exchange not in category_info["exchanges"]:
+                return {
+                    "category": category,
+                    "exchange": exchange,
+                    "error": f"Category {category} not available on exchange {exchange}",
+                    "available_exchanges": category_info["exchanges"]
+                }
+            
+            table_mapping = {
+                'LSE': 'bronze.lse_market_data_raw',
+                'CME': 'bronze.cme_market_data_raw',
+                'NYQ': 'bronze.nyq_market_data_raw'
+            }
+            
+            table_name = table_mapping.get(exchange)
+            if not table_name:
+                return {
+                    "error": f"No table found for exchange {exchange}",
+                    "available_exchanges": list(table_mapping.keys())
+                }
+            
+            if not self.db.table_exists(table_name):
+                return {
+                    "error": f"Table {table_name} does not exist"
+                }
+            
+            # Build the query to get ALL raw data for the category symbols
+            symbol_list = "', '".join(symbols)
+            
+            # Build WHERE clause
+            where_clauses = [f"\"#RIC\" IN ('{symbol_list}')"]
+            
+            if start_date:
+                where_clauses.append(f"data_date >= '{start_date}'")
+            if end_date:
+                where_clauses.append(f"data_date <= '{end_date}'")
+            
+            where_clause = " AND ".join(where_clauses)
+            
+            # Query to get ALL raw data (not aggregated)
+            query = f"""
+            SELECT 
+                data_date,
+                "#RIC" as symbol,
+                "Date-Time" as datetime,
+                "Type",
+                Price,
+                Volume,
+                "Exch Time" as exchange_time,
+                "Qualifiers"
+            FROM {table_name}
+            WHERE {where_clause}
+            ORDER BY data_date, "#RIC", "Date-Time"
+            """
+            
+            logger.info(f"Executing export query for {category} on {exchange}")
+            result_df = self.db.execute_query(query)
+            
+            if result_df.empty:
+                return {
+                    "category": category,
+                    "exchange": exchange,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "error": "No data found for the specified criteria",
+                    "symbols_searched": symbols
+                }
+            
+            # Generate filename if not provided
+            if not output_filename:
+                timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
+                date_suffix = ""
+                if start_date and end_date:
+                    date_suffix = f"_{start_date}_to_{end_date}"
+                elif start_date:
+                    date_suffix = f"_from_{start_date}"
+                elif end_date:
+                    date_suffix = f"_until_{end_date}"
+                
+                output_filename = f"{category}_{exchange.lower()}{date_suffix}_{timestamp}.{format if format else 'csv'}"
+            
+            # Ensure the filename has the correct extension
+            if not output_filename.endswith(f".{format if format else 'csv'}"):
+                output_filename += f".{format if format else 'csv'}"
+            
+            # Create exports directory if it doesn't exist
+            export_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports")
+            os.makedirs(export_dir, exist_ok=True)
+            
+            # Full path for the output file
+            output_path = os.path.join(export_dir, output_filename)
+            
+            # Export the data
+            if format == "json":
+                result_df.to_json(output_path, orient='records', date_format='iso', indent=2)
+            else:  # Default to CSV
+                result_df.to_csv(output_path, index=False)
+            
+            # Calculate summary statistics
+            summary_stats = {
+                "total_records": len(result_df),
+                "unique_symbols": result_df['symbol'].nunique(),
+                "symbols_found": sorted(result_df['symbol'].unique().tolist()),
+                "date_range": {
+                    "earliest": str(result_df['data_date'].min()),
+                    "latest": str(result_df['data_date'].max())
+                },
+                "unique_dates": result_df['data_date'].nunique(),
+                "total_volume": result_df['Volume'].sum() if result_df['Volume'].dtype in ['int64', 'float64'] else "N/A",
+                "avg_price": result_df['Price'].mean() if result_df['Price'].dtype in ['int64', 'float64'] else "N/A"
+            }
+            
+            return {
+                "category": category,
+                "description": category_info["description"],
+                "exchange": exchange,
+                "export_details": {
+                    "output_file": output_path,
+                    "filename": output_filename,
+                    "format": format if format else "csv",
+                    "file_size_mb": round(os.path.getsize(output_path) / (1024 * 1024), 2)
+                },
+                "query_info": {
+                    "symbols_requested": symbols,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "table_queried": table_name
+                },
+                "summary_statistics": summary_stats,
+                "export_timestamp": dt.now().isoformat(),
+                "note": f"Successfully exported {len(result_df)} records for {category} category"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error exporting category data: {e}")
+            import traceback
+            logger.error(f"Export error traceback: {traceback.format_exc()}")
+            return {"error": str(e)}
 
 async def main():
     """Main entry point"""

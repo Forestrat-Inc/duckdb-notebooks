@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Data Dashboard</title>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .control-panel {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-shutdown {
+            background: #e53e3e;
+            color: white;
+        }
+
+        .btn-resume {
+            background: #38a169;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            color: #4a5568;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-running {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-idle {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .status-stopped {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .chart-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            color: #4a5568;
+        }
+
+        .chart-placeholder {
+            height: 300px;
+            background: #f7fafc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0aec0;
+        }
+
+        .activity-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .activity-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            color: #4a5568;
+        }
+
+        .activity-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .activity-table th,
+        .activity-table td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .activity-table th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .progress-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .exchange-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .exchange-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .exchange-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #a0aec0;
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-summary {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .error-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <i data-feather="activity"></i>
+            Market Data Dashboard
+        </h1>
+        <div class="control-panel">
+            <span id="system-status" class="status-indicator status-idle">
+                <i data-feather="circle"></i>
+                <span>Loading...</span>
+            </span>
+            <button class="btn btn-shutdown" onclick="shutdownSystem()">
+                <i data-feather="square"></i>
+                Shutdown
+            </button>
+            <button class="btn btn-resume" onclick="resumeSystem()">
+                <i data-feather="play"></i>
+                Resume
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- System Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <i data-feather="activity"></i>
+                    <span>System Status</span>
+                </div>
+                <div class="stat-value" id="system-status-text">Idle</div>
+                <div class="stat-label">Current State</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <i data-feather="file"></i>
+                    <span>Total Files</span>
+                </div>
+                <div class="stat-value" id="total-files">0</div>
+                <div class="stat-label">Files Processed</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <i data-feather="check-circle"></i>
+                    <span>Completed</span>
+                </div>
+                <div class="stat-value" id="completed-files">0</div>
+                <div class="stat-label">Successfully Loaded</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <i data-feather="database"></i>
+                    <span>Total Records</span>
+                </div>
+                <div class="stat-value" id="total-records">0</div>
+                <div class="stat-label">Market Data Points</div>
+            </div>
+        </div>
+
+        <!-- Exchange Progress -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <i data-feather="bar-chart-2"></i>
+                <span>Exchange Progress</span>
+            </div>
+            <div class="progress-section" id="exchange-progress">
+                <div class="no-data">Loading exchange data...</div>
+            </div>
+        </div>
+
+        <!-- Daily Progress Chart -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <i data-feather="trending-up"></i>
+                <span>Daily Progress Chart</span>
+            </div>
+            <div class="chart-placeholder" id="daily-chart">
+                <span>No performance data available</span>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="activity-section">
+            <div class="activity-header">
+                <i data-feather="clock"></i>
+                <span>Recent Activity</span>
+            </div>
+            <div id="recent-activity">
+                <div class="no-data">No recent activity</div>
+            </div>
+        </div>
+
+        <!-- Error Summary -->
+        <div class="error-summary">
+            <div class="error-header">
+                <i data-feather="alert-triangle"></i>
+                <span>Error Summary</span>
+            </div>
+            <div id="error-summary">
+                <div class="no-data" style="color: #38a169;">No errors</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+
+        // Global state
+        let systemStatus = 'idle';
+        let refreshInterval;
+
+        // API calls
+        async function fetchData(endpoint) {
+            try {
+                const response = await fetch(`/api/${endpoint}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        // Update system status
+        async function updateSystemStatus() {
+            const data = await fetchData('system-status');
+            if (data) {
+                const statusEl = document.getElementById('system-status');
+                const statusTextEl = document.getElementById('system-status-text');
+                const statusSpan = statusEl.querySelector('span');
+                
+                statusEl.className = `status-indicator status-${data.status.toLowerCase()}`;
+                statusSpan.textContent = data.status;
+                statusTextEl.textContent = data.status;
+                
+                systemStatus = data.status.toLowerCase();
+            }
+        }
+
+        // Update data summary
+        async function updateDataSummary() {
+            const data = await fetchData('data-summary');
+            if (data) {
+                document.getElementById('total-records').textContent = formatNumber(data.total_records);
+                
+                // Update exchange progress
+                const progressContainer = document.getElementById('exchange-progress');
+                if (data.exchanges && data.exchanges.length > 0) {
+                    progressContainer.innerHTML = data.exchanges.map(exchange => `
+                        <div class="exchange-card">
+                            <div class="exchange-header">
+                                <div class="exchange-name">${exchange.exchange}</div>
+                                <div class="status-indicator status-running">
+                                    <i data-feather="check"></i>
+                                    Data Available
+                                </div>
+                            </div>
+                            <div class="stat-value">${formatNumber(exchange.records)}</div>
+                            <div class="stat-label">Records</div>
+                            ${exchange.min_date ? `<div class="stat-label">Range: ${exchange.min_date} to ${exchange.max_date}</div>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    progressContainer.innerHTML = '<div class="no-data">No data available</div>';
+                }
+                
+                feather.replace();
+            }
+        }
+
+        // Update recent activity
+        async function updateRecentActivity() {
+            const data = await fetchData('recent-activity');
+            const container = document.getElementById('recent-activity');
+            
+            if (data && data.length > 0) {
+                container.innerHTML = `
+                    <table class="activity-table">
+                        <thead>
+                            <tr>
+                                <th>Exchange</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Records</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(activity => `
+                                <tr>
+                                    <td>${activity.exchange}</td>
+                                    <td>${activity.data_date}</td>
+                                    <td>
+                                        <span class="status-indicator status-${activity.status === 'completed' ? 'running' : 'stopped'}">
+                                            ${activity.status}
+                                        </span>
+                                    </td>
+                                    <td>${formatNumber(activity.records_loaded || 0)}</td>
+                                    <td>${calculateDuration(activity.start_time, activity.end_time)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                container.innerHTML = '<div class="no-data">No recent activity</div>';
+            }
+        }
+
+        // Update performance stats
+        async function updatePerformanceStats() {
+            const data = await fetchData('performance-stats');
+            if (data && data.length > 0) {
+                const totalFiles = data.reduce((sum, stat) => sum + (stat.total_loads || 0), 0);
+                const completedFiles = data.reduce((sum, stat) => sum + (stat.total_loads || 0), 0);
+                
+                document.getElementById('total-files').textContent = formatNumber(totalFiles);
+                document.getElementById('completed-files').textContent = formatNumber(completedFiles);
+            }
+        }
+
+        // Update error summary
+        async function updateErrorSummary() {
+            const data = await fetchData('error-summary');
+            const container = document.getElementById('error-summary');
+            
+            if (data && data.total_errors > 0) {
+                container.innerHTML = `
+                    <div class="stat-value" style="color: #e53e3e;">${data.total_errors}</div>
+                    <div class="stat-label">Total Errors</div>
+                    ${data.recent_errors.map(error => `
+                        <div style="margin-top: 1rem; padding: 1rem; background: #fed7d7; border-radius: 8px;">
+                            <strong>${error.exchange}:</strong> ${error.error_message} (${error.error_count} times)
+                        </div>
+                    `).join('')}
+                `;
+            } else {
+                container.innerHTML = '<div class="no-data" style="color: #38a169;">No errors</div>';
+            }
+        }
+
+        // Utility functions
+        function formatNumber(num) {
+            if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return num.toLocaleString();
+        }
+
+        function calculateDuration(start, end) {
+            if (!start || !end) return 'N/A';
+            const startTime = new Date(start);
+            const endTime = new Date(end);
+            const duration = (endTime - startTime) / 1000; // seconds
+            
+            if (duration < 60) return `${duration.toFixed(1)}s`;
+            if (duration < 3600) return `${(duration / 60).toFixed(1)}m`;
+            return `${(duration / 3600).toFixed(1)}h`;
+        }
+
+        // Control functions
+        function shutdownSystem() {
+            // This would call a shutdown API endpoint
+            alert('Shutdown functionality would be implemented here');
+        }
+
+        function resumeSystem() {
+            // This would call a resume API endpoint
+            alert('Resume functionality would be implemented here');
+        }
+
+        // Data refresh
+        async function refreshData() {
+            await Promise.all([
+                updateSystemStatus(),
+                updateDataSummary(),
+                updateRecentActivity(),
+                updatePerformanceStats(),
+                updateErrorSummary()
+            ]);
+        }
+
+        // Initialize dashboard
+        async function initDashboard() {
+            await refreshData();
+            
+            // Set up auto-refresh every 10 seconds
+            refreshInterval = setInterval(refreshData, 10000);
+        }
+
+        // Start dashboard when page loads
+        document.addEventListener('DOMContentLoaded', initDashboard);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) clearInterval(refreshInterval);
+        });
+    </script>
+</body>
+</html> 

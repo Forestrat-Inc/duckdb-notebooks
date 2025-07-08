@@ -16,19 +16,24 @@ from config.settings import config
 class DuckDBManager:
     """Manager class for DuckDB operations with S3 integration"""
     
-    def __init__(self, database_path: Optional[str] = None):
+    def __init__(self, database_path: Optional[str] = None, read_only: bool = False):
         self.database_path = database_path or config.DUCKDB_DATABASE_PATH
+        self.read_only = read_only
         self.connection = None
         self.logger = logging.getLogger(__name__)
         
-        # Ensure database directory exists
-        os.makedirs(os.path.dirname(self.database_path), exist_ok=True)
+        # Ensure database directory exists (only if not read-only)
+        if not read_only:
+            os.makedirs(os.path.dirname(self.database_path), exist_ok=True)
         
     def connect(self) -> duckdb.DuckDBPyConnection:
         """Create and configure DuckDB connection"""
         if self.connection is None:
-            self.connection = duckdb.connect(self.database_path)
-            self._configure_connection()
+            self.connection = duckdb.connect(self.database_path, read_only=self.read_only)
+            if not self.read_only:
+                self._configure_connection()
+            else:
+                self.logger.info("Connected to DuckDB in READ-ONLY mode (skipping S3 configuration)")
             
         return self.connection
     
@@ -36,11 +41,18 @@ class DuckDBManager:
         """Configure DuckDB connection with S3 and performance settings"""
         conn = self.connection
         
-        # Install and load required extensions
-        conn.execute("INSTALL httpfs")
-        conn.execute("INSTALL aws") 
-        conn.execute("LOAD httpfs")
-        conn.execute("LOAD aws")
+        # Install and load required extensions (with error handling)
+        try:
+            conn.execute("INSTALL httpfs")
+            conn.execute("LOAD httpfs")
+        except Exception as e:
+            self.logger.warning(f"httpfs extension already loaded or failed: {e}")
+        
+        try:
+            conn.execute("INSTALL aws") 
+            conn.execute("LOAD aws")
+        except Exception as e:
+            self.logger.warning(f"aws extension already loaded or failed: {e}")
         
         # Configure memory and performance settings
         conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
@@ -60,36 +72,39 @@ class DuckDBManager:
     
     def _configure_s3_credentials(self, conn):
         """Configure S3 credentials for DuckDB"""
-        if config.AWS_PROFILE:
-            # Use AWS profile
-            conn.execute(f"""
-                CREATE OR REPLACE SECRET s3_secret (
-                    TYPE s3,
-                    PROVIDER credential_chain,
-                    CHAIN 'config',
-                    PROFILE '{config.AWS_PROFILE}'
-                )
-            """)
-        elif config.AWS_ACCESS_KEY_ID and config.AWS_SECRET_ACCESS_KEY:
-            # Use explicit credentials
-            conn.execute(f"""
-                CREATE OR REPLACE SECRET s3_secret (
-                    TYPE s3,
-                    KEY_ID '{config.AWS_ACCESS_KEY_ID}',
-                    SECRET '{config.AWS_SECRET_ACCESS_KEY}',
-                    REGION '{config.AWS_DEFAULT_REGION}'
-                )
-            """)
-        else:
-            # Use credential chain (environment variables, IAM roles, etc.)
-            conn.execute("""
-                CREATE OR REPLACE SECRET s3_secret (
-                    TYPE s3,
-                    PROVIDER credential_chain
-                )
-            """)
-        
-        self.logger.info("S3 credentials configured")
+        try:
+            if config.AWS_PROFILE:
+                # Use AWS profile
+                conn.execute(f"""
+                    CREATE OR REPLACE SECRET s3_secret (
+                        TYPE s3,
+                        PROVIDER credential_chain,
+                        CHAIN 'config',
+                        PROFILE '{config.AWS_PROFILE}'
+                    )
+                """)
+            elif config.AWS_ACCESS_KEY_ID and config.AWS_SECRET_ACCESS_KEY:
+                # Use explicit credentials
+                conn.execute(f"""
+                    CREATE OR REPLACE SECRET s3_secret (
+                        TYPE s3,
+                        KEY_ID '{config.AWS_ACCESS_KEY_ID}',
+                        SECRET '{config.AWS_SECRET_ACCESS_KEY}',
+                        REGION '{config.AWS_DEFAULT_REGION}'
+                    )
+                """)
+            else:
+                # Use credential chain (environment variables, IAM roles, etc.)
+                conn.execute("""
+                    CREATE OR REPLACE SECRET s3_secret (
+                        TYPE s3,
+                        PROVIDER credential_chain
+                    )
+                """)
+            
+            self.logger.info("S3 credentials configured")
+        except Exception as e:
+            self.logger.warning(f"S3 credential configuration failed (may already exist): {e}")
     
     def test_s3_connection(self) -> bool:
         """Test S3 connection by listing files"""
