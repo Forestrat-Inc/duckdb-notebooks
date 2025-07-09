@@ -55,7 +55,7 @@ When you run the script, it automatically writes to both databases:
 
 The script uses these Supabase credentials (built-in):
 - **Host**: `your-project.supabase.co` (example)
-- **Port**: `5432`
+- **Port**: `6543`
 - **Database**: `postgres`
 - **User**: `postgres.your-user-id` (example)
 - **Password**: `your-database-password` (example)

@@ -27,7 +27,7 @@ pip install s3fs>=2023.1.0
 ### 2. Network Access
 Ensure NiFi can reach Supabase:
 - **Host**: `your-project.supabase.co` (example)
-- **Port**: `5432`
+- **Port**: `6543`
 - **Protocol**: PostgreSQL over SSL
 
 Test connectivity from your NiFi server:
@@ -54,7 +54,7 @@ Module Directory: /opt/nifi/scripts
 #### Environment Variables (Optional - for security):
 ```
 SUPABASE_HOST=your-project.supabase.co
-SUPABASE_PORT=5432
+SUPABASE_PORT=6543
 SUPABASE_DATABASE=postgres
 SUPABASE_USER=postgres.your-user-id
 SUPABASE_PASSWORD=your-database-password
@@ -123,7 +123,7 @@ If Supabase is unavailable:
 
 2. **Connection timeout to Supabase**
    - Check network connectivity
-   - Verify firewall rules allow outbound port 5432
+   - Verify firewall rules allow outbound port 6543
 
 3. **Authentication failed**
    - Verify Supabase credentials

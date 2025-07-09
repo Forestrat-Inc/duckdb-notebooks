@@ -30,7 +30,7 @@ class SupabaseManager:
         """Initialize Supabase connection"""
         # Use environment variables if parameters not provided
         self.host = host or os.getenv('SUPABASE_HOST')
-        self.port = port or int(os.getenv('SUPABASE_PORT', '5432'))
+        self.port = port or int(os.getenv('SUPABASE_PORT', '6543'))
         self.database = database or os.getenv('SUPABASE_DATABASE', 'postgres')
         self.user = user or os.getenv('SUPABASE_USER')
         self.password = password or os.getenv('SUPABASE_PASSWORD')

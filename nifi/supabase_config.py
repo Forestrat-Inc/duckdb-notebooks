@@ -26,7 +26,7 @@ def get_supabase_config() -> Dict[str, str]:
     # Get configuration from environment variables
     config = {
         'host': os.getenv('SUPABASE_HOST'),
-        'port': int(os.getenv('SUPABASE_PORT', '5432')),
+        'port': int(os.getenv('SUPABASE_PORT', '6543')),
         'database': os.getenv('SUPABASE_DATABASE', 'postgres'),
         'user': os.getenv('SUPABASE_USER'),
         'password': os.getenv('SUPABASE_PASSWORD')

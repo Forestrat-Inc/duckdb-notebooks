@@ -141,11 +141,11 @@ if [ -z "$SUPABASE_HOST" ] || [ -z "$SUPABASE_USER" ] || [ -z "$SUPABASE_PASSWOR
     print_status "  SUPABASE_USER (e.g., postgres)"
     print_status "  SUPABASE_PASSWORD (your database password)"
     print_status "  SUPABASE_DATABASE (optional, defaults to postgres)"
-    print_status "  SUPABASE_PORT (optional, defaults to 5432)"
+    print_status "  SUPABASE_PORT (optional, defaults to 6543)"
 fi
 
 # Set defaults for optional Supabase parameters
-export SUPABASE_PORT="${SUPABASE_PORT:-5432}"
+export SUPABASE_PORT="${SUPABASE_PORT:-6543}"
 export SUPABASE_DATABASE="${SUPABASE_DATABASE:-postgres}"
 
 # Handle special commands
