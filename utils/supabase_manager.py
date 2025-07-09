@@ -91,6 +91,13 @@ class SupabaseManager:
     def execute_sql(self, sql: str, params: Optional[tuple] = None) -> bool:
         """Execute SQL statement"""
         try:
+            # Check connection status and reconnect if needed
+            if self.connection.closed:
+                self.logger.warning("Connection closed, attempting to reconnect...")
+                if not self.connect():
+                    self.logger.error("Failed to reconnect to Supabase")
+                    return False
+            
             # Convert numpy types to Python types
             if params:
                 params = tuple(self._convert_numpy_types(param) for param in params)
@@ -100,7 +107,8 @@ class SupabaseManager:
                 self.connection.commit()
                 return True
         except Exception as e:
-            self.connection.rollback()
+            if self.connection and not self.connection.closed:
+                self.connection.rollback()
             self.logger.error(f"SQL execution failed: {e}")
             self.logger.error(f"SQL: {sql}")
             if params:
@@ -110,6 +118,13 @@ class SupabaseManager:
     def execute_query(self, sql: str, params: Optional[tuple] = None) -> pd.DataFrame:
         """Execute query and return results as DataFrame"""
         try:
+            # Check connection status and reconnect if needed
+            if self.connection.closed:
+                self.logger.warning("Connection closed, attempting to reconnect...")
+                if not self.connect():
+                    self.logger.error("Failed to reconnect to Supabase")
+                    return pd.DataFrame()
+            
             # Convert numpy types to Python types
             if params:
                 params = tuple(self._convert_numpy_types(param) for param in params)
@@ -181,7 +196,7 @@ class SupabaseManager:
             successful_files INTEGER DEFAULT 0,
             failed_files INTEGER DEFAULT 0,
             total_records BIGINT DEFAULT 0,
-            avg_records_per_file DECIMAL(10,2),
+                            avg_records_per_file DECIMAL(15,2),
             total_processing_time_seconds DECIMAL(10,2),
             created_at TIMESTAMP DEFAULT NOW(),
             UNIQUE(stats_date, exchange)
@@ -222,6 +237,13 @@ class SupabaseManager:
     def insert_progress_record(self, exchange: str, data_date: date, file_path: str) -> Optional[int]:
         """Insert new progress record and return its ID"""
         try:
+            # Check connection status and reconnect if needed
+            if self.connection.closed:
+                self.logger.warning("Connection closed, attempting to reconnect...")
+                if not self.connect():
+                    self.logger.error("Failed to reconnect to Supabase")
+                    return None
+            
             sql = """
             INSERT INTO bronze.load_progress (exchange, data_date, file_path, start_time, status)
             VALUES (%s, %s, %s, NOW(), 'started')
@@ -242,7 +264,8 @@ class SupabaseManager:
                 return progress_id
                 
         except Exception as e:
-            self.connection.rollback()
+            if self.connection and not self.connection.closed:
+                self.connection.rollback()
             self.logger.error(f"Failed to insert progress record: {e}")
             return None
     

@@ -257,7 +257,7 @@ class SimpleMultiExchangeLoader:
                 successful_files INTEGER DEFAULT 0,
                 failed_files INTEGER DEFAULT 0,
                 total_records BIGINT DEFAULT 0,
-                avg_records_per_file DECIMAL(10,2),
+                avg_records_per_file DECIMAL(15,2),
                 total_processing_time_seconds DECIMAL(10,2),
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(stats_date, exchange)
@@ -352,6 +352,8 @@ class SimpleMultiExchangeLoader:
         
         start_time = datetime.now()
         progress_id = None
+        # Initialize progress_tracking early to avoid reference before assignment
+        progress_tracking = None
         
         try:
             # Log which date we're processing
