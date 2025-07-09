@@ -283,7 +283,7 @@ class SimpleMultiExchangeLoader:
                 successful_files INTEGER DEFAULT 0,
                 failed_files INTEGER DEFAULT 0,
                 total_records BIGINT DEFAULT 0,
-                avg_records_per_file DECIMAL(15,2),
+                avg_records_per_file DECIMAL(20,2),
                 total_processing_time_seconds DECIMAL(10,2),
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(stats_date, exchange)
@@ -298,7 +298,7 @@ class SimpleMultiExchangeLoader:
                 week_ending DATE NOT NULL,
                 exchange VARCHAR NOT NULL,
                 avg_daily_files DECIMAL(10,2),
-                avg_daily_records DECIMAL(15,2),
+                avg_daily_records DECIMAL(20,2),
                 total_files INTEGER DEFAULT 0,
                 total_records BIGINT DEFAULT 0,
                 avg_processing_time_seconds DECIMAL(10,2),

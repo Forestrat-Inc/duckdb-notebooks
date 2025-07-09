@@ -14,7 +14,7 @@ CREATE TABLE gold.daily_load_stats (
     successful_files INTEGER DEFAULT 0,
     failed_files INTEGER DEFAULT 0,
     total_records BIGINT DEFAULT 0,
-    avg_records_per_file DECIMAL(15,2),  -- Increased from DECIMAL(10,2)
+    avg_records_per_file DECIMAL(20,2),  -- Increased from DECIMAL(10,2) to handle trillion-scale records
     total_processing_time_seconds DECIMAL(10,2),
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(stats_date, exchange)
@@ -25,4 +25,5 @@ INSERT INTO gold.daily_load_stats SELECT * FROM gold.daily_load_stats_backup;
 DROP TABLE gold.daily_load_stats_backup;
 
 -- For Supabase: Use ALTER TABLE (PostgreSQL supports this)
--- ALTER TABLE gold.daily_load_stats ALTER COLUMN avg_records_per_file TYPE DECIMAL(15,2); 
+-- ALTER TABLE gold.daily_load_stats ALTER COLUMN avg_records_per_file TYPE DECIMAL(20,2);
+-- ALTER TABLE gold.weekly_load_stats ALTER COLUMN avg_daily_records TYPE DECIMAL(20,2); 
