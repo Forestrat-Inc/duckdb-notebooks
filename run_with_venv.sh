@@ -7,8 +7,8 @@
 #   ./run_with_venv.sh --install-deps      # Install/update all dependencies
 #   ./run_with_venv.sh --check-deps        # Check if all dependencies are installed
 
-# Set the project directory
-PROJECT_DIR="/Users/kaushal/Documents/Forestrat/duckdb"
+# Set the project directory to the directory where this script is located
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$PROJECT_DIR/venv"
 SCRIPT_NAME="load_january_simple.py"
 
