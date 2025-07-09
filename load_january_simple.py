@@ -174,29 +174,55 @@ class SimpleMultiExchangeLoader:
         # Initialize statistics tracking
         self._initialize_stats_tracking()
         
-        # Progress tracking for long operations
-        self._operation_start_time = None
-        self._progress_logger_active = False
+        # Progress tracking for long operations (thread-safe)
+        self._active_progress_threads = {}
     
     def _start_progress_logger(self, operation_name: str, exchange: str, data_date: date):
         """Start a background thread to log progress during long operations"""
-        self._operation_start_time = time.time()
-        self._progress_logger_active = True
+        # Create unique key for this operation
+        operation_key = f"{exchange}_{data_date}_{operation_name}"
+        
+        # Stop any existing thread for this operation
+        self._stop_progress_logger(operation_key)
+        
+        # Create operation-specific tracking
+        operation_data = {
+            'start_time': time.time(),
+            'active': True,
+            'operation_name': operation_name,
+            'exchange': exchange,
+            'data_date': data_date
+        }
         
         def log_progress():
-            while self._progress_logger_active:
+            while operation_data['active']:
                 time.sleep(30)  # Log every 30 seconds
-                if self._progress_logger_active:
-                    elapsed = time.time() - self._operation_start_time
-                    self.logger.info(f"⏳ {operation_name} for {exchange} {data_date} - {elapsed:.0f}s elapsed, still processing...")
+                if operation_data['active']:
+                    elapsed = time.time() - operation_data['start_time']
+                    self.logger.info(f"⏳ {operation_data['operation_name']} for {operation_data['exchange']} {operation_data['data_date']} - {elapsed:.0f}s elapsed, still processing...")
         
         # Start background thread
         progress_thread = threading.Thread(target=log_progress, daemon=True)
         progress_thread.start()
+        
+        # Store thread info
+        self._active_progress_threads[operation_key] = {
+            'thread': progress_thread,
+            'data': operation_data
+        }
     
-    def _stop_progress_logger(self):
-        """Stop the progress logger"""
-        self._progress_logger_active = False
+    def _stop_progress_logger(self, operation_key: str = None):
+        """Stop the progress logger for a specific operation or all operations"""
+        if operation_key:
+            # Stop specific operation
+            if operation_key in self._active_progress_threads:
+                self._active_progress_threads[operation_key]['data']['active'] = False
+                del self._active_progress_threads[operation_key]
+        else:
+            # Stop all progress loggers (for cleanup)
+            for key in list(self._active_progress_threads.keys()):
+                self._active_progress_threads[key]['data']['active'] = False
+            self._active_progress_threads.clear()
     
     def check_shutdown_requested(self) -> bool:
         """Check if shutdown has been requested"""
@@ -453,7 +479,9 @@ class SimpleMultiExchangeLoader:
             self.logger.info(f"📁 Source: {data_path}")
             
             # Start progress logger for long operations
-            self._start_progress_logger("Data Loading", exchange, data_date)
+            operation_name = "Data Loading"
+            operation_key = f"{exchange}_{data_date}_{operation_name}"
+            self._start_progress_logger(operation_name, exchange, data_date)
             
             # Use transaction for non-blocking load
             self.logger.info(f"🔄 Starting transaction for {exchange} {data_date}")
@@ -484,8 +512,8 @@ class SimpleMultiExchangeLoader:
                 self.db_manager.execute_sql(insert_sql)
                 insert_duration = time.time() - insert_start
                 
-                # Stop progress logger
-                self._stop_progress_logger()
+                # Stop progress logger for this specific operation
+                self._stop_progress_logger(operation_key)
                 self.logger.info(f"✅ INSERT completed in {insert_duration:.1f}s")
                 
                 # Check for shutdown request before committing
@@ -528,8 +556,8 @@ class SimpleMultiExchangeLoader:
                 self.stats['total_records'] += records_loaded
                 
             except Exception as e:
-                # Stop progress logger on error
-                self._stop_progress_logger()
+                # Stop progress logger on error for this specific operation
+                self._stop_progress_logger(operation_key)
                 # Rollback transaction on error
                 self.db_manager.execute_sql("ROLLBACK")
                 raise e
@@ -907,8 +935,11 @@ class SimpleMultiExchangeLoader:
             self.logger.info(f"   Status: COMPLETED")
     
     def cleanup(self):
-        """Clean up database connections"""
+        """Clean up database connections and stop all progress loggers"""
         try:
+            # Stop all active progress loggers
+            self._stop_progress_logger()
+            
             if self.supabase_manager:
                 self.supabase_manager.disconnect()
                 self.logger.info("🔌 Supabase connection closed")
