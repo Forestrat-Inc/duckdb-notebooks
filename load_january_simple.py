@@ -879,6 +879,11 @@ def main():
     
     # Configure logging based on verbosity
     log_level = logging.DEBUG if args.verbose else logging.INFO
+    
+    # Ensure logs directory exists
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+    
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
