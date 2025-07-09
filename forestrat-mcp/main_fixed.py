@@ -2315,9 +2315,18 @@ class ForestratMCPServer:
 
 async def main():
     """Main entry point"""
+    import argparse
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Forestrat MCP Server')
+    parser.add_argument('--database-path', '-d', 
+                       help='Path to the DuckDB database file',
+                       default=None)
+    args = parser.parse_args()
+    
     try:
-        # Initialize the server
-        server = ForestratMCPServer()
+        # Initialize the server with optional database path
+        server = ForestratMCPServer(database_path=args.database_path)
         
         # Run the server
         await server.run()
