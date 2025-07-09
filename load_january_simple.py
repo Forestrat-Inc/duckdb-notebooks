@@ -15,6 +15,8 @@ import logging
 import sys
 import signal
 import argparse
+import time
+import threading
 from datetime import date, datetime
 from pathlib import Path
 import pandas as pd
@@ -171,6 +173,30 @@ class SimpleMultiExchangeLoader:
         
         # Initialize statistics tracking
         self._initialize_stats_tracking()
+        
+        # Progress tracking for long operations
+        self._operation_start_time = None
+        self._progress_logger_active = False
+    
+    def _start_progress_logger(self, operation_name: str, exchange: str, data_date: date):
+        """Start a background thread to log progress during long operations"""
+        self._operation_start_time = time.time()
+        self._progress_logger_active = True
+        
+        def log_progress():
+            while self._progress_logger_active:
+                time.sleep(30)  # Log every 30 seconds
+                if self._progress_logger_active:
+                    elapsed = time.time() - self._operation_start_time
+                    self.logger.info(f"⏳ {operation_name} for {exchange} {data_date} - {elapsed:.0f}s elapsed, still processing...")
+        
+        # Start background thread
+        progress_thread = threading.Thread(target=log_progress, daemon=True)
+        progress_thread.start()
+    
+    def _stop_progress_logger(self):
+        """Stop the progress logger"""
+        self._progress_logger_active = False
     
     def check_shutdown_requested(self) -> bool:
         """Check if shutdown has been requested"""
@@ -329,20 +355,28 @@ class SimpleMultiExchangeLoader:
         
         try:
             # Log which date we're processing
-            self.logger.info(f"Loading {exchange} data for date: {data_date}")
+            self.logger.info(f"📂 Loading {exchange} data for date: {data_date}")
             
             # Get S3 path
             data_path = self.get_s3_path(exchange, data_date, stage, 'Data')
             table_name = f"bronze.{exchange.lower()}_market_data_raw"
+            
+            self.logger.info(f"📍 Step 1/5: Checking table schema for {exchange}")
             
             # Check if table exists, if not create it
             check_query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = 'bronze' AND table_name = '{exchange.lower()}_market_data_raw'"
             existing = self.db_manager.execute_query(check_query)
             
             if existing.empty:
+                self.logger.info(f"📋 Creating new table for {exchange}")
                 if not self.create_dynamic_table(exchange, data_path):
                     result['error'] = f"Failed to create table for {exchange}"
                     return result
+                self.logger.info(f"✅ Table created successfully for {exchange}")
+            else:
+                self.logger.info(f"✅ Table already exists for {exchange}")
+            
+            self.logger.info(f"📍 Step 2/5: Checking for existing data")
             
             # Check if data already exists
             check_existing = f"""
@@ -366,6 +400,10 @@ class SimpleMultiExchangeLoader:
                     result['error'] = f"Data already exists for {exchange} {data_date} {stage}"
                     self.logger.warning(f"⚠️  {exchange} {data_date}: Data already exists (use --idempotent to skip)")
                     return result
+            else:
+                self.logger.info(f"✅ No existing data found - proceeding with load")
+            
+            self.logger.info(f"📍 Step 3/5: Recording progress tracking")
             
             # Generate next ID for progress tracking
             next_id_query = "SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM bronze.load_progress"
@@ -409,14 +447,21 @@ class SimpleMultiExchangeLoader:
                 self._update_progress_failed(progress_tracking, result['error'])
                 return result
             
+            self.logger.info(f"📍 Step 4/5: Loading data from S3")
+            self.logger.info(f"📁 Source: {data_path}")
+            
+            # Start progress logger for long operations
+            self._start_progress_logger("Data Loading", exchange, data_date)
+            
             # Use transaction for non-blocking load
-            self.logger.info(f"Starting transaction for {exchange} {data_date}")
+            self.logger.info(f"🔄 Starting transaction for {exchange} {data_date}")
             
             # Begin transaction
             self.db_manager.execute_sql("BEGIN TRANSACTION")
             
             try:
                 # Load data with dynamic approach
+                self.logger.info(f"📊 Executing INSERT operation - this may take several minutes for large files...")
                 insert_sql = f"""
                 INSERT INTO {table_name}
                 SELECT 
@@ -433,7 +478,13 @@ class SimpleMultiExchangeLoader:
                 """
                 
                 # Execute the insert within transaction
+                insert_start = time.time()
                 self.db_manager.execute_sql(insert_sql)
+                insert_duration = time.time() - insert_start
+                
+                # Stop progress logger
+                self._stop_progress_logger()
+                self.logger.info(f"✅ INSERT completed in {insert_duration:.1f}s")
                 
                 # Check for shutdown request before committing
                 if self.check_shutdown_requested():
@@ -442,7 +493,10 @@ class SimpleMultiExchangeLoader:
                     self._update_progress_failed(progress_tracking, result['error'])
                     return result
                 
+                self.logger.info(f"📍 Step 5/5: Finalizing transaction")
+                
                 # Get count of loaded records
+                self.logger.info(f"🔢 Counting loaded records...")
                 count_query = f"""
                 SELECT COUNT(*) as count 
                 FROM {table_name} 
@@ -450,9 +504,12 @@ class SimpleMultiExchangeLoader:
                 """
                 count_result = self.db_manager.execute_query(count_query)
                 records_loaded = count_result.iloc[0]['count']
+                self.logger.info(f"📊 Records counted: {records_loaded:,}")
                 
                 # Commit transaction
+                self.logger.info(f"💾 Committing transaction...")
                 self.db_manager.execute_sql("COMMIT")
+                self.logger.info(f"✅ Transaction committed successfully")
                 
                 end_time = datetime.now()
                 processing_time = (end_time - start_time).total_seconds()
@@ -469,6 +526,8 @@ class SimpleMultiExchangeLoader:
                 self.stats['total_records'] += records_loaded
                 
             except Exception as e:
+                # Stop progress logger on error
+                self._stop_progress_logger()
                 # Rollback transaction on error
                 self.db_manager.execute_sql("ROLLBACK")
                 raise e
@@ -591,20 +650,24 @@ class SimpleMultiExchangeLoader:
         
         self.logger.info(f"\n{'='*60}")
         self.logger.info(f"Processing date: {target_date}")
+        self.logger.info(f"Exchanges to process: {', '.join(self.exchanges)} ({len(self.exchanges)} total)")
         self.logger.info(f"{'='*60}")
         
         # Process each exchange for this date
-        for exchange in self.exchanges:
+        for idx, exchange in enumerate(self.exchanges, 1):
             # Check for shutdown request before processing each exchange
             if self.check_shutdown_requested():
                 self.logger.info(f"🛑 Skipping {exchange} for {target_date} due to shutdown request")
                 results['interrupted'] = True
                 break
             
-            self.logger.info(f"Processing {exchange} for {target_date}...")
+            self.logger.info(f"\n🏢 Processing {exchange} for {target_date} ({idx}/{len(self.exchanges)})")
+            self.logger.info(f"📈 Progress: {((idx-1)/len(self.exchanges)*100):.1f}% complete")
             
             # Load single file for this exchange and date
+            exchange_start = time.time()
             result = self.load_single_file(exchange, target_date, stage)
+            exchange_duration = time.time() - exchange_start
             results['exchanges'][exchange] = result
             results['total_files'] += 1
             
@@ -612,14 +675,20 @@ class SimpleMultiExchangeLoader:
             if result['success']:
                 if result.get('skipped', False):
                     results['skipped_files'] += 1
+                    self.logger.info(f"⏭️  {exchange} completed in {exchange_duration:.1f}s - {result['records_loaded']:,} records already loaded")
                 else:
                     results['successful_files'] += 1
                     # Update daily statistics after each successful file
                     self._update_daily_stats(exchange, target_date)
+                    self.logger.info(f"✅ {exchange} completed in {exchange_duration:.1f}s - {result['records_loaded']:,} new records loaded")
                 
                 results['total_records'] += result['records_loaded']
             else:
                 results['failed_files'] += 1
+                self.logger.info(f"❌ {exchange} failed after {exchange_duration:.1f}s - {result.get('error', 'Unknown error')}")
+            
+            # Show running totals
+            self.logger.info(f"📊 Running totals: {results['total_records']:,} records, {results['successful_files']} successful, {results['failed_files']} failed, {results['skipped_files']} skipped")
             
             # Check for shutdown request after processing
             if self.check_shutdown_requested():
@@ -923,12 +992,16 @@ def main():
             logger.info("🛑 Processing was interrupted")
         
         # Log detailed results for each exchange
+        logger.info(f"\n{'='*60}")
+        logger.info(f"DETAILED RESULTS FOR {target_date}")
+        logger.info(f"{'='*60}")
         for exchange, result in results['exchanges'].items():
             if result['success']:
                 if result.get('skipped', False):
                     logger.info(f"⏭️  {exchange}: {result['records_loaded']:,} records already loaded")
                 else:
-                    logger.info(f"✅ {exchange}: {result['records_loaded']:,} records loaded in {result['processing_time']:.2f}s")
+                    rate = result['records_loaded'] / result['processing_time'] if result['processing_time'] > 0 else 0
+                    logger.info(f"✅ {exchange}: {result['records_loaded']:,} records loaded in {result['processing_time']:.2f}s ({rate:,.0f} records/sec)")
             else:
                 if "already exists" in str(result.get('error', '')):
                     logger.info(f"⏭️  {exchange}: Data already exists, skipping")
