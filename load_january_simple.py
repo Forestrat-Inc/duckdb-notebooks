@@ -21,12 +21,14 @@ from datetime import date, datetime
 from pathlib import Path
 import pandas as pd
 import duckdb
+from typing import Optional
 
 # Add project root to path
 project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
 from utils.database import DuckDBManager
+from utils.database import S3Manager
 from utils.supabase_manager import SupabaseManager
 
 # Global flag for graceful shutdown
@@ -147,6 +149,14 @@ class SimpleMultiExchangeLoader:
         self.logger = logging.getLogger(__name__)
         self.idempotent = idempotent
         
+        # Initialize S3 manager for file metadata
+        try:
+            self.s3_manager = S3Manager()
+            self.logger.info("✅ S3 manager initialized for file metadata retrieval")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to initialize S3 manager - file sizes will not be tracked: {e}")
+            self.s3_manager = None
+        
         # Initialize Supabase connection for statistics
         try:
             self.supabase_manager = SupabaseManager()
@@ -263,6 +273,7 @@ class SimpleMultiExchangeLoader:
                 exchange VARCHAR NOT NULL,
                 data_date DATE NOT NULL,
                 file_path VARCHAR NOT NULL,
+                file_size_bytes BIGINT,
                 start_time TIMESTAMP DEFAULT NOW(),
                 end_time TIMESTAMP,
                 status VARCHAR DEFAULT 'started', -- started, completed, failed
@@ -283,6 +294,8 @@ class SimpleMultiExchangeLoader:
                 successful_files INTEGER DEFAULT 0,
                 failed_files INTEGER DEFAULT 0,
                 total_records BIGINT DEFAULT 0,
+                total_file_size_bytes BIGINT DEFAULT 0,
+                avg_file_size_bytes DECIMAL(20,2),
                 avg_records_per_file DECIMAL(20,2),
                 total_processing_time_seconds DECIMAL(10,2),
                 created_at TIMESTAMP DEFAULT NOW(),
@@ -299,8 +312,10 @@ class SimpleMultiExchangeLoader:
                 exchange VARCHAR NOT NULL,
                 avg_daily_files DECIMAL(10,2),
                 avg_daily_records DECIMAL(20,2),
+                avg_daily_file_size_bytes DECIMAL(20,2),
                 total_files INTEGER DEFAULT 0,
                 total_records BIGINT DEFAULT 0,
+                total_file_size_bytes BIGINT DEFAULT 0,
                 avg_processing_time_seconds DECIMAL(10,2),
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(week_ending, exchange)
@@ -318,6 +333,27 @@ class SimpleMultiExchangeLoader:
         date_str = data_date.isoformat()
         return (f"s3://vendor-data-s3/LSEG/TRTH/{exchange.upper()}/{stage}/"
                 f"{date_str}/data/merged/{exchange.upper()}-{date_str}-NORMALIZEDMP-{file_type}-1-of-1.csv.gz")
+    
+    def get_file_size_bytes(self, s3_path: str) -> Optional[int]:
+        """Get file size in bytes from S3 path"""
+        if not self.s3_manager:
+            return None
+            
+        try:
+            # Extract the S3 key from the full path
+            # s3://bucket-name/path/to/file -> path/to/file
+            if s3_path.startswith('s3://'):
+                parts = s3_path.replace('s3://', '').split('/', 1)
+                if len(parts) == 2:
+                    bucket, key = parts
+                    file_info = self.s3_manager.get_file_info(key)
+                    if file_info:
+                        return file_info['size']
+                        
+        except Exception as e:
+            self.logger.warning(f"Failed to get file size for {s3_path}: {e}")
+            
+        return None
     
     def create_dynamic_table(self, exchange: str, sample_file_path: str) -> bool:
         """Create table dynamically based on actual file schema"""
@@ -433,6 +469,13 @@ class SimpleMultiExchangeLoader:
             
             self.logger.info(f"📍 Step 3/5: Recording progress tracking")
             
+            # Get file size information
+            file_size_bytes = self.get_file_size_bytes(data_path)
+            if file_size_bytes:
+                self.logger.info(f"📏 File size: {file_size_bytes:,} bytes ({file_size_bytes/1024/1024:.1f} MB)")
+            else:
+                self.logger.warning(f"⚠️ Could not determine file size for {data_path}")
+            
             # Generate next ID for progress tracking
             next_id_query = "SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM bronze.load_progress"
             next_id_result = self.db_manager.execute_query(next_id_query)
@@ -440,15 +483,15 @@ class SimpleMultiExchangeLoader:
             
             # Record start of processing in DuckDB
             insert_progress_sql = f"""
-            INSERT INTO bronze.load_progress (id, exchange, data_date, file_path, start_time, status)
-            VALUES ({next_id}, '{exchange}', '{data_date}', '{data_path}', NOW(), 'started')
+            INSERT INTO bronze.load_progress (id, exchange, data_date, file_path, file_size_bytes, start_time, status)
+            VALUES ({next_id}, '{exchange}', '{data_date}', '{data_path}', {file_size_bytes if file_size_bytes else 'NULL'}, NOW(), 'started')
             """
             self.db_manager.execute_sql(insert_progress_sql)
             
             # Also record in Supabase if available
             supabase_progress_id = None
             if self.supabase_manager:
-                supabase_progress_id = self.supabase_manager.insert_progress_record(exchange, data_date, data_path)
+                supabase_progress_id = self.supabase_manager.insert_progress_record(exchange, data_date, data_path, file_size_bytes)
             
             # Get the progress ID from DuckDB
             progress_id_query = f"""
