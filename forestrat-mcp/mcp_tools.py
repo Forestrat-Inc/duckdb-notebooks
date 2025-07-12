@@ -1440,3 +1440,154 @@ class ForestratTools:
             "gold": "Aggregated and analyzed market data for business insights"
         }
         return descriptions.get(schema, f"Data schema: {schema}") 
+
+    async def get_next_futures_symbols(
+        self, 
+        product_type: str, 
+        start_month_name: str, 
+        start_year: int, 
+        num_futures: int
+    ) -> Dict[str, Any]:
+        """
+        Get the next N futures symbols for a type of product (bitcoin, micro bitcoin, etc.)
+        
+        Args:
+            product_type: Type of product ("bitcoin", "micro bitcoin", "ethereum", etc.)
+            start_month_name: Starting month name (e.g., "January")
+            start_year: Starting year (e.g., 2025)
+            num_futures: Number of consecutive futures to generate
+            
+        Returns:
+            Dict containing the generated symbols and metadata
+        """
+        try:
+            # Product type mapping
+            product_mapping = {
+                "bitcoin": {"symbol": "BTC", "type": "standard"},
+                "micro bitcoin": {"symbol": "MBT", "type": "micro"},
+                "standard bitcoin": {"symbol": "BTC", "type": "standard"},
+                "btc": {"symbol": "BTC", "type": "standard"},
+                "mbt": {"symbol": "MBT", "type": "micro"}
+            }
+            
+            product_key = product_type.lower()
+            
+            # Check if product type is supported
+            if product_key not in product_mapping:
+                return {
+                    "product_type": product_type,
+                    "status": "work_in_progress",
+                    "message": f"Product type '{product_type}' is not yet supported. Currently only Bitcoin products are available.",
+                    "supported_products": list(product_mapping.keys()),
+                    "symbols": []
+                }
+            
+            # Get the mapped product info
+            product_info = product_mapping[product_key]
+            symbol_prefix = product_info["symbol"]
+            
+            # Generate the symbols using the internal function
+            symbols = self._generate_futures_symbols(
+                start_month_name=start_month_name,
+                start_year=start_year,
+                num_futures=num_futures,
+                symbol_prefix=symbol_prefix
+            )
+            
+            return {
+                "product_type": product_type,
+                "mapped_to": {
+                    "symbol_prefix": symbol_prefix,
+                    "product_category": product_info["type"]
+                },
+                "generation_parameters": {
+                    "start_month": start_month_name,
+                    "start_year": start_year,
+                    "num_futures": num_futures
+                },
+                "symbols": symbols,
+                "symbol_count": len(symbols),
+                "note": f"Generated {len(symbols)} consecutive futures symbols starting from {start_month_name} {start_year}"
+            }
+            
+        except ValueError as e:
+            logger.error(f"Validation error in get_next_futures_symbols: {e}")
+            return {
+                "product_type": product_type,
+                "error": f"Validation error: {str(e)}",
+                "symbols": []
+            }
+        except Exception as e:
+            logger.error(f"Error generating futures symbols: {e}")
+            return {
+                "product_type": product_type,
+                "error": str(e),
+                "symbols": []
+            }
+    
+    def _generate_futures_symbols(
+        self, 
+        start_month_name: str, 
+        start_year: int, 
+        num_futures: int, 
+        symbol_prefix: str
+    ) -> list[str]:
+        """
+        Generates CME futures symbols for a specified number of consecutive months.
+        
+        This is the core logic adapted from the provided function.
+        """
+        # Mapping of full month names to their CME single-letter codes
+        MONTH_CODES = {
+            "January": "F", "February": "G", "March": "H", "April": "J",
+            "May": "K", "June": "M", "July": "N", "August": "Q",
+            "September": "U", "October": "V", "November": "X", "December": "Z"
+        }
+        
+        # Reverse mapping for numerical month (1-12) to full month name for iteration
+        MONTH_NAMES_BY_NUM = {
+            1: "January", 2: "February", 3: "March", 4: "April",
+            5: "May", 6: "June", 7: "July", 8: "August",
+            9: "September", 10: "October", 11: "November", 12: "December"
+        }
+        
+        # Mapping of full month names to their numerical representation (1-12)
+        MONTH_NUMS = {name: num for num, name in MONTH_NAMES_BY_NUM.items()}
+        
+        # --- Input Validation ---
+        if start_month_name not in MONTH_CODES:
+            raise ValueError(f"Invalid start_month_name: '{start_month_name}'. "
+                           "Please use a full month name (e.g., 'January').")
+        if not isinstance(start_year, int) or start_year < 0:
+            raise ValueError("start_year must be a non-negative integer.")
+        if not isinstance(num_futures, int) or num_futures <= 0:
+            # If num_futures is 0 or negative, return an empty list as no futures are requested
+            return []
+        
+        symbols = []
+        
+        # Initialize current month and year for iteration
+        current_month_num = MONTH_NUMS[start_month_name]
+        current_year = start_year
+        
+        # Loop to generate the specified number of futures symbols
+        for _ in range(num_futures):
+            # Get the full month name and its corresponding CME code
+            month_name = MONTH_NAMES_BY_NUM[current_month_num]
+            month_code = MONTH_CODES[month_name]
+            
+            # Get the last digit of the current year for the symbol
+            year_code = str(current_year)[-1]
+            
+            # Construct the full futures symbol
+            symbol = f"{symbol_prefix}{month_code}{year_code}"
+            symbols.append(symbol)
+            
+            # Increment the month for the next iteration
+            current_month_num += 1
+            # If the month rolls over past December, reset to January and increment the year
+            if current_month_num > 12:
+                current_month_num = 1
+                current_year += 1
+        
+        return symbols 

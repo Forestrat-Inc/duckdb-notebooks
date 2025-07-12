@@ -374,6 +374,38 @@ class ForestratMCPServer:
                     "required": ["category", "exchange"],
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "get_next_futures_symbols",
+                "description": "Generate the next N futures symbols for a product type (bitcoin -> BTC, micro bitcoin -> MBT, others return 'work in progress')",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "product_type": {
+                            "type": "string",
+                            "description": "Type of product: 'bitcoin', 'micro bitcoin', 'standard bitcoin', 'btc', 'mbt', or any other (returns work in progress)"
+                        },
+                        "start_month_name": {
+                            "type": "string",
+                            "enum": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+                            "description": "Starting month name (full month name with first letter capitalized)"
+                        },
+                        "start_year": {
+                            "type": "integer",
+                            "description": "Starting year (e.g., 2025)",
+                            "minimum": 2020,
+                            "maximum": 2030
+                        },
+                        "num_futures": {
+                            "type": "integer",
+                            "description": "Number of consecutive futures contracts to generate",
+                            "minimum": 1,
+                            "maximum": 24
+                        }
+                    },
+                    "required": ["product_type", "start_month_name", "start_year", "num_futures"],
+                    "additionalProperties": False
+                }
             }
         ]
         
@@ -737,6 +769,13 @@ class ForestratMCPServer:
                     arguments.get("end_date"),
                     arguments.get("output_filename"),
                     arguments.get("format")
+                )
+            elif name == "get_next_futures_symbols":
+                result = await self.tools.get_next_futures_symbols(
+                    arguments["product_type"],
+                    arguments["start_month_name"],
+                    arguments["start_year"],
+                    arguments["num_futures"]
                 )
             else:
                 logger.error(f"❌ Unknown tool requested: {name}")

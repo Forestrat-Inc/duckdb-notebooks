@@ -16,6 +16,12 @@ This MCP server provides tools to query and analyze market data from multiple ex
 4. **query_data** - Execute SQL-like queries on the data
 5. **get_table_schema** - Get the schema/structure of a specific table
 6. **get_available_symbols** - Get available symbols/instruments for a given exchange
+7. **get_most_active_symbols** - Get the most active symbols for a specific date by volume or trade count
+8. **get_least_active_symbols** - Get the least active symbols for a specific date by volume or trade count
+9. **get_symbols_by_category** - Get predefined symbol lists by category (bitcoin_futures, ethereum_futures, etc.)
+10. **get_category_volume_data** - Get volume and trading data for a specific symbol category
+11. **export_category_data** - Export all data for a specific futures category to a CSV or JSON file
+12. **get_next_futures_symbols** - Generate the next N consecutive futures symbols for a product type
 
 ## Database Structure
 
@@ -130,6 +136,32 @@ python server.py
     "exchange": "LSE",
     "start_date": "2024-01-01",
     "end_date": "2024-01-31"
+  }
+}
+```
+
+#### Generate futures symbols
+```json
+{
+  "tool": "get_next_futures_symbols",
+  "arguments": {
+    "product_type": "bitcoin",
+    "start_month_name": "February",
+    "start_year": 2025,
+    "num_futures": 6
+  }
+}
+```
+
+#### Generate micro bitcoin futures symbols
+```json
+{
+  "tool": "get_next_futures_symbols",
+  "arguments": {
+    "product_type": "micro bitcoin",
+    "start_month_name": "January",
+    "start_year": 2025,
+    "num_futures": 12
   }
 }
 ```
