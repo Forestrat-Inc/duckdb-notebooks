@@ -264,62 +264,17 @@ class SimpleMultiExchangeLoader:
             self.logger.error(f"Error creating schemas: {e}")
     
     def _initialize_stats_tracking(self):
-        """Initialize statistics tracking tables"""
+        """Initialize statistics tracking tables - ONLY in Supabase"""
         try:
-            # Create simple load progress table
-            progress_table_sql = """
-            CREATE TABLE IF NOT EXISTS bronze.load_progress (
-                id INTEGER PRIMARY KEY,
-                exchange VARCHAR NOT NULL,
-                data_date DATE NOT NULL,
-                file_path VARCHAR NOT NULL,
-                file_size_bytes BIGINT,
-                start_time TIMESTAMP DEFAULT NOW(),
-                end_time TIMESTAMP,
-                status VARCHAR DEFAULT 'started', -- started, completed, failed
-                records_loaded INTEGER DEFAULT 0,
-                error_message TEXT,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-            """
-            self.db_manager.execute_sql(progress_table_sql)
+            # Initialize Supabase tracking tables only
+            if self.supabase_manager:
+                self.supabase_manager.initialize_schemas()
+                self.logger.info("✅ Supabase statistics tracking tables initialized successfully")
+            else:
+                self.logger.warning("⚠️ Supabase manager not available - no tracking tables will be created")
             
-            # Create daily stats table
-            daily_stats_sql = """
-            CREATE TABLE IF NOT EXISTS gold.daily_load_stats (
-                id INTEGER PRIMARY KEY,
-                stats_date DATE NOT NULL,
-                exchange VARCHAR NOT NULL,
-                total_files INTEGER DEFAULT 0,
-                successful_files INTEGER DEFAULT 0,
-                failed_files INTEGER DEFAULT 0,
-                total_records BIGINT DEFAULT 0,
-                avg_records_per_file DECIMAL(20,2),
-                total_processing_time_seconds DECIMAL(10,2),
-                created_at TIMESTAMP DEFAULT NOW(),
-                UNIQUE(stats_date, exchange)
-            )
-            """
-            self.db_manager.execute_sql(daily_stats_sql)
-            
-            # Create weekly rolling stats table
-            weekly_stats_sql = """
-            CREATE TABLE IF NOT EXISTS gold.weekly_load_stats (
-                id INTEGER PRIMARY KEY,
-                week_ending DATE NOT NULL,
-                exchange VARCHAR NOT NULL,
-                avg_daily_files DECIMAL(10,2),
-                avg_daily_records DECIMAL(20,2),
-                total_files INTEGER DEFAULT 0,
-                total_records BIGINT DEFAULT 0,
-                avg_processing_time_seconds DECIMAL(10,2),
-                created_at TIMESTAMP DEFAULT NOW(),
-                UNIQUE(week_ending, exchange)
-            )
-            """
-            self.db_manager.execute_sql(weekly_stats_sql)
-            
-            self.logger.info("Statistics tracking tables initialized successfully")
+            # NOTE: DuckDB is used ONLY for market data storage, not tracking data
+            self.logger.info("🔍 DuckDB will be used only for market data storage (no tracking tables)")
             
         except Exception as e:
             self.logger.error(f"Error initializing statistics tracking: {e}")
@@ -472,41 +427,18 @@ class SimpleMultiExchangeLoader:
             else:
                 self.logger.warning(f"⚠️ Could not determine file size for {data_path}")
             
-            # Generate next ID for progress tracking
-            next_id_query = "SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM bronze.load_progress"
-            next_id_result = self.db_manager.execute_query(next_id_query)
-            next_id = next_id_result.iloc[0]['next_id']
-            
-            # Record start of processing in DuckDB
-            insert_progress_sql = f"""
-            INSERT INTO bronze.load_progress (id, exchange, data_date, file_path, file_size_bytes, start_time, status)
-            VALUES ({next_id}, '{exchange}', '{data_date}', '{data_path}', {file_size_bytes if file_size_bytes else 'NULL'}, NOW(), 'started')
-            """
-            self.db_manager.execute_sql(insert_progress_sql)
-            
-            # Also record in Supabase if available
+            # Record start of processing in Supabase ONLY (no DuckDB tracking)
             supabase_progress_id = None
             if self.supabase_manager:
                 supabase_progress_id = self.supabase_manager.insert_progress_record(exchange, data_date, data_path, file_size_bytes)
+                self.logger.info(f"📊 Progress tracking started in Supabase (ID: {supabase_progress_id})")
+            else:
+                self.logger.warning("⚠️ Supabase manager not available - no progress tracking will be recorded")
             
-            # Get the progress ID from DuckDB
-            progress_id_query = f"""
-            SELECT id FROM bronze.load_progress 
-            WHERE exchange = '{exchange}' AND data_date = '{data_date}' AND file_path = '{data_path}'
-            ORDER BY created_at DESC LIMIT 1
-            """
-            progress_result = self.db_manager.execute_query(progress_id_query)
-            progress_id = progress_result.iloc[0]['id'] if not progress_result.empty else None
-            
-            # Store both IDs for proper tracking
+            # Store only Supabase ID for progress tracking
             progress_tracking = {
-                'duckdb_id': progress_id,
                 'supabase_id': supabase_progress_id
             }
-            
-            # Use Supabase progress ID if available for progress tracking
-            if supabase_progress_id:
-                progress_id = supabase_progress_id
             
             # Check for shutdown request before starting transaction
             if self.check_shutdown_requested():
@@ -620,57 +552,37 @@ class SimpleMultiExchangeLoader:
             self.stats['files_processed'] += 1
     
     def _update_progress_completed(self, progress_tracking: dict, records_loaded: int, processing_time: float):
-        """Update progress record as completed"""
+        """Update progress record as completed - ONLY in Supabase"""
         if not progress_tracking:
             self.logger.warning("No progress tracking info available for completion update")
             return
             
         try:
-            # Update DuckDB if we have the ID
-            duckdb_id = progress_tracking.get('duckdb_id')
-            if duckdb_id:
-                update_sql = f"""
-                UPDATE bronze.load_progress 
-                SET end_time = NOW(), 
-                    status = 'completed',
-                    records_loaded = {records_loaded}
-                WHERE id = {duckdb_id}
-                """
-                self.db_manager.execute_sql(update_sql)
-            
-            # Update Supabase if available and we have the ID
+            # Update Supabase ONLY (no DuckDB tracking)
             supabase_id = progress_tracking.get('supabase_id')
             if self.supabase_manager and supabase_id:
                 self.supabase_manager.update_progress_completed(supabase_id, records_loaded)
+                self.logger.debug(f"✅ Progress updated in Supabase (ID: {supabase_id}): {records_loaded:,} records")
+            else:
+                self.logger.warning("⚠️ Cannot update progress - Supabase manager not available or no progress ID")
                 
         except Exception as e:
             self.logger.error(f"Failed to update progress: {e}")
     
     def _update_progress_failed(self, progress_tracking: dict, error_message: str):
-        """Update progress record as failed"""
+        """Update progress record as failed - ONLY in Supabase"""
         if not progress_tracking:
             self.logger.warning("No progress tracking info available for failure update")
             return
             
         try:
-            # Update DuckDB if we have the ID
-            duckdb_id = progress_tracking.get('duckdb_id')
-            if duckdb_id:
-                # Escape single quotes in error message
-                escaped_error = error_message.replace("'", "''")
-                update_sql = f"""
-                UPDATE bronze.load_progress 
-                SET end_time = NOW(), 
-                    status = 'failed',
-                    error_message = '{escaped_error}'
-                WHERE id = {duckdb_id}
-                """
-                self.db_manager.execute_sql(update_sql)
-            
-            # Update Supabase if available and we have the ID
+            # Update Supabase ONLY (no DuckDB tracking)
             supabase_id = progress_tracking.get('supabase_id')
             if self.supabase_manager and supabase_id:
                 self.supabase_manager.update_progress_failed(supabase_id, error_message)
+                self.logger.debug(f"❌ Progress marked as failed in Supabase (ID: {supabase_id})")
+            else:
+                self.logger.warning("⚠️ Cannot update progress - Supabase manager not available or no progress ID")
                 
         except Exception as e:
             self.logger.error(f"Failed to update progress: {e}")
@@ -768,179 +680,43 @@ class SimpleMultiExchangeLoader:
         return results
     
     def _update_daily_stats(self, exchange: str, stats_date: date):
-        """Update daily statistics for an exchange"""
+        """Update daily statistics for an exchange - ONLY in Supabase"""
         try:
-            # Update DuckDB daily stats
-            # Generate next ID for daily stats
-            next_id_query = "SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM gold.daily_load_stats"
-            next_id_result = self.db_manager.execute_query(next_id_query)
-            next_id = next_id_result.iloc[0]['next_id']
-            
-            # Calculate daily stats from progress table
-            stats_sql = f"""
-            INSERT INTO gold.daily_load_stats (
-                id,
-                stats_date, 
-                exchange, 
-                total_files, 
-                successful_files, 
-                failed_files, 
-                total_records,
-                avg_records_per_file,
-                total_processing_time_seconds
-            )
-            SELECT 
-                {next_id} as id,
-                '{stats_date}' as stats_date,
-                '{exchange}' as exchange,
-                COUNT(*) as total_files,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_files,
-                COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_files,
-                SUM(COALESCE(records_loaded, 0)) as total_records,
-                AVG(COALESCE(records_loaded, 0)) as avg_records_per_file,
-                SUM(EXTRACT(EPOCH FROM (COALESCE(end_time, NOW()) - start_time))) as total_processing_time_seconds
-            FROM bronze.load_progress
-            WHERE exchange = '{exchange}' 
-            AND data_date = '{stats_date}'
-            ON CONFLICT (stats_date, exchange) DO UPDATE SET
-                total_files = EXCLUDED.total_files,
-                successful_files = EXCLUDED.successful_files,
-                failed_files = EXCLUDED.failed_files,
-                total_records = EXCLUDED.total_records,
-                avg_records_per_file = EXCLUDED.avg_records_per_file,
-                total_processing_time_seconds = EXCLUDED.total_processing_time_seconds,
-                created_at = NOW()
-            """
-            self.db_manager.execute_sql(stats_sql)
-            
-            # Also update Supabase if available
+            # Update Supabase ONLY (no DuckDB stats tracking)
             if self.supabase_manager:
                 self.supabase_manager.upsert_daily_stats(exchange, stats_date)
                 self.logger.debug(f"📊 Updated Supabase daily stats for {exchange} {stats_date}")
+            else:
+                self.logger.warning(f"⚠️ Cannot update daily stats - Supabase manager not available")
             
         except Exception as e:
             self.logger.error(f"Failed to update daily stats for {exchange} {stats_date}: {e}")
     
     def _update_weekly_stats(self, exchange: str, week_ending: date):
-        """Update weekly rolling statistics for an exchange"""
+        """Update weekly rolling statistics for an exchange - ONLY in Supabase"""
         try:
-            # Update DuckDB weekly stats
-            # Generate next ID for weekly stats
-            next_id_query = "SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM gold.weekly_load_stats"
-            next_id_result = self.db_manager.execute_query(next_id_query)
-            next_id = next_id_result.iloc[0]['next_id']
-            
-            # Calculate 7-day rolling stats
-            weekly_sql = f"""
-            INSERT INTO gold.weekly_load_stats (
-                id,
-                week_ending,
-                exchange,
-                avg_daily_files,
-                avg_daily_records,
-                total_files,
-                total_records,
-                avg_processing_time_seconds
-            )
-            SELECT 
-                {next_id} as id,
-                '{week_ending}' as week_ending,
-                '{exchange}' as exchange,
-                AVG(total_files) as avg_daily_files,
-                AVG(total_records) as avg_daily_records,
-                SUM(total_files) as total_files,
-                SUM(total_records) as total_records,
-                AVG(total_processing_time_seconds) as avg_processing_time_seconds
-            FROM gold.daily_load_stats
-            WHERE exchange = '{exchange}' 
-            AND stats_date >= DATE('{week_ending}') - INTERVAL '6 days'
-            AND stats_date <= '{week_ending}'
-            ON CONFLICT (week_ending, exchange) DO UPDATE SET
-                avg_daily_files = EXCLUDED.avg_daily_files,
-                avg_daily_records = EXCLUDED.avg_daily_records,
-                total_files = EXCLUDED.total_files,
-                total_records = EXCLUDED.total_records,
-                avg_processing_time_seconds = EXCLUDED.avg_processing_time_seconds,
-                created_at = NOW()
-            """
-            self.db_manager.execute_sql(weekly_sql)
-            
-            # Also update Supabase if available
+            # Update Supabase ONLY (no DuckDB stats tracking)
             if self.supabase_manager:
                 self.supabase_manager.upsert_weekly_stats(exchange, week_ending)
                 self.logger.debug(f"📊 Updated Supabase weekly stats for {exchange} {week_ending}")
+            else:
+                self.logger.warning(f"⚠️ Cannot update weekly stats - Supabase manager not available")
             
         except Exception as e:
             self.logger.error(f"Failed to update weekly stats for {exchange} {week_ending}: {e}")
     
     def generate_final_stats_report(self):
-        """Generate comprehensive statistics after loading completion"""
+        """Generate comprehensive statistics after loading completion - ONLY from Supabase"""
         try:
             # Update weekly stats for all exchanges
             for exchange in self.exchanges:
                 self._update_weekly_stats(exchange, date.today())
             
-            # Generate summary report
-            summary_sql = """
-            SELECT 
-                d.exchange,
-                d.stats_date,
-                d.total_files,
-                d.successful_files,
-                d.failed_files,
-                d.total_records,
-                ROUND(d.avg_records_per_file, 0) as avg_records_per_file,
-                ROUND(d.total_processing_time_seconds, 2) as total_processing_time_seconds,
-                ROUND(d.total_records / NULLIF(d.total_processing_time_seconds, 0), 0) as records_per_second
-            FROM gold.daily_load_stats d
-            ORDER BY d.exchange, d.stats_date
-            """
-            
-            daily_stats = self.db_manager.execute_query(summary_sql)
-            
-            if not daily_stats.empty:
-                self.logger.info("\n" + "="*80)
-                self.logger.info("DAILY STATISTICS SUMMARY")
-                self.logger.info("="*80)
-                for _, row in daily_stats.iterrows():
-                    self.logger.info(f"{row['exchange']} - {row['stats_date']}:")
-                    self.logger.info(f"  Files: {row['total_files']} total, {row['successful_files']} successful, {row['failed_files']} failed")
-                    self.logger.info(f"  Records: {row['total_records']:,} total, {row['avg_records_per_file']:,} avg per file")
-                    self.logger.info(f"  Performance: {row['total_processing_time_seconds']}s total, {row['records_per_second']:,} records/sec")
-                    self.logger.info("")
-            
-            # Weekly stats report
-            weekly_sql = """
-            SELECT 
-                exchange,
-                week_ending,
-                ROUND(avg_daily_files, 1) as avg_daily_files,
-                ROUND(avg_daily_records, 0) as avg_daily_records,
-                total_files,
-                total_records,
-                ROUND(avg_processing_time_seconds, 2) as avg_processing_time_seconds
-            FROM gold.weekly_load_stats
-            ORDER BY exchange, week_ending DESC
-            """
-            
-            weekly_stats = self.db_manager.execute_query(weekly_sql)
-            
-            if not weekly_stats.empty:
-                self.logger.info("\n" + "="*80)
-                self.logger.info("WEEKLY ROLLING STATISTICS")
-                self.logger.info("="*80)
-                for _, row in weekly_stats.iterrows():
-                    self.logger.info(f"{row['exchange']} - Week ending {row['week_ending']}:")
-                    self.logger.info(f"  Daily averages: {row['avg_daily_files']} files, {row['avg_daily_records']:,} records")
-                    self.logger.info(f"  Weekly totals: {row['total_files']} files, {row['total_records']:,} records")
-                    self.logger.info(f"  Avg processing time: {row['avg_processing_time_seconds']}s")
-                    self.logger.info("")
-            
             # Generate Supabase summary report if available
             if self.supabase_manager:
                 try:
                     self.logger.info("\n" + "="*80)
-                    self.logger.info("SUPABASE STATISTICS SUMMARY")
+                    self.logger.info("STATISTICS SUMMARY (from Supabase)")
                     self.logger.info("="*80)
                     
                     # Get progress summary from Supabase
@@ -952,10 +728,36 @@ class SimpleMultiExchangeLoader:
                             self.logger.info(f"  Total records: {row['total_records']:,}")
                             self.logger.info("")
                     
-                    self.logger.info("📊 Statistics have been synchronized to Supabase database")
+                    # Get daily stats from Supabase
+                    daily_stats = self.supabase_manager.get_daily_stats()
+                    if not daily_stats.empty:
+                        self.logger.info("\n" + "="*80)
+                        self.logger.info("DAILY STATISTICS (from Supabase)")
+                        self.logger.info("="*80)
+                        for _, row in daily_stats.iterrows():
+                            self.logger.info(f"{row['exchange']} - {row['stats_date']}:")
+                            self.logger.info(f"  Files: {row['total_files']} total, {row['successful_files']} successful, {row['failed_files']} failed")
+                            self.logger.info(f"  Records: {row['total_records']:,} total")
+                            self.logger.info("")
+                    
+                    # Get weekly stats from Supabase
+                    weekly_stats = self.supabase_manager.get_weekly_stats()
+                    if not weekly_stats.empty:
+                        self.logger.info("\n" + "="*80)
+                        self.logger.info("WEEKLY ROLLING STATISTICS (from Supabase)")
+                        self.logger.info("="*80)
+                        for _, row in weekly_stats.iterrows():
+                            self.logger.info(f"{row['exchange']} - Week ending {row['week_ending']}:")
+                            self.logger.info(f"  Daily averages: {row['avg_daily_files']} files, {row['avg_daily_records']:,} records")
+                            self.logger.info(f"  Weekly totals: {row['total_files']} files, {row['total_records']:,} records")
+                            self.logger.info("")
+                    
+                    self.logger.info("📊 All statistics are stored in Supabase database")
                     
                 except Exception as e:
                     self.logger.warning(f"⚠️ Failed to generate Supabase report: {e}")
+            else:
+                self.logger.warning("⚠️ Supabase manager not available - no statistics report generated")
                     
         except Exception as e:
             self.logger.error(f"Failed to generate final stats report: {e}")
@@ -1116,11 +918,10 @@ def main():
         loader.cleanup()
         
         logger.info(f"\n📊 Database queries to check status:")
-        logger.info(f"   DuckDB Progress: SELECT * FROM bronze.load_progress WHERE data_date = '{target_date}' ORDER BY start_time DESC")
-        logger.info(f"   DuckDB Daily stats: SELECT * FROM gold.daily_load_stats WHERE stats_date = '{target_date}' ORDER BY exchange")
-        logger.info(f"   DuckDB Weekly stats: SELECT * FROM gold.weekly_load_stats ORDER BY week_ending DESC, exchange")
+        logger.info(f"   DuckDB Market Data: SELECT exchange, COUNT(*) as record_count FROM bronze.{target_date.strftime('%Y%m%d')}_market_data GROUP BY exchange")
         logger.info(f"   Supabase Progress: SELECT * FROM bronze.load_progress WHERE data_date = '{target_date}' ORDER BY start_time DESC")
         logger.info(f"   Supabase Daily stats: SELECT * FROM gold.daily_load_stats WHERE stats_date = '{target_date}' ORDER BY exchange")
+        logger.info(f"   Supabase Weekly stats: SELECT * FROM gold.weekly_load_stats ORDER BY week_ending DESC, exchange")
         
         if shutdown_requested or check_shutdown_file():
             logger.info(f"\n🔄 To resume: python {sys.argv[0]} --date {target_date} --idempotent")
@@ -1129,7 +930,7 @@ def main():
         else:
             # Clean up shutdown file on successful completion
             remove_shutdown_file()  # Remove regardless of whether it exists
-            logger.info("✅ Script completed successfully - statistics saved to both DuckDB and Supabase")
+            logger.info("✅ Script completed successfully - market data saved to DuckDB, statistics saved to Supabase")
 
 if __name__ == "__main__":
     main() 
