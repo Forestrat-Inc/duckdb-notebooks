@@ -197,8 +197,6 @@ class SupabaseManager:
             successful_files INTEGER DEFAULT 0,
             failed_files INTEGER DEFAULT 0,
             total_records BIGINT DEFAULT 0,
-            total_file_size_bytes BIGINT DEFAULT 0,
-            avg_file_size_bytes DECIMAL(20,2),
             avg_records_per_file DECIMAL(20,2),
             total_processing_time_seconds DECIMAL(10,2),
             created_at TIMESTAMP DEFAULT NOW(),
@@ -224,10 +222,8 @@ class SupabaseManager:
             exchange VARCHAR(50) NOT NULL,
             avg_daily_files DECIMAL(10,2),
             avg_daily_records DECIMAL(20,2),
-            avg_daily_file_size_bytes DECIMAL(20,2),
             total_files INTEGER DEFAULT 0,
             total_records BIGINT DEFAULT 0,
-            total_file_size_bytes BIGINT DEFAULT 0,
             avg_processing_time_seconds DECIMAL(10,2),
             created_at TIMESTAMP DEFAULT NOW(),
             UNIQUE(week_ending, exchange)
@@ -328,8 +324,6 @@ class SupabaseManager:
                 successful_files, 
                 failed_files, 
                 total_records,
-                total_file_size_bytes,
-                avg_file_size_bytes,
                 avg_records_per_file,
                 total_processing_time_seconds
             )
@@ -340,8 +334,6 @@ class SupabaseManager:
                 COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_files,
                 COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_files,
                 SUM(COALESCE(records_loaded, 0)) as total_records,
-                SUM(COALESCE(file_size_bytes, 0)) as total_file_size_bytes,
-                AVG(COALESCE(file_size_bytes, 0)) as avg_file_size_bytes,
                 AVG(COALESCE(records_loaded, 0)) as avg_records_per_file,
                 SUM(EXTRACT(EPOCH FROM (COALESCE(end_time, NOW()) - start_time))) as total_processing_time_seconds
             FROM bronze.load_progress
@@ -352,8 +344,6 @@ class SupabaseManager:
                 successful_files = EXCLUDED.successful_files,
                 failed_files = EXCLUDED.failed_files,
                 total_records = EXCLUDED.total_records,
-                total_file_size_bytes = EXCLUDED.total_file_size_bytes,
-                avg_file_size_bytes = EXCLUDED.avg_file_size_bytes,
                 avg_records_per_file = EXCLUDED.avg_records_per_file,
                 total_processing_time_seconds = EXCLUDED.total_processing_time_seconds,
                 created_at = NOW()
@@ -373,10 +363,8 @@ class SupabaseManager:
                 exchange,
                 avg_daily_files,
                 avg_daily_records,
-                avg_daily_file_size_bytes,
                 total_files,
                 total_records,
-                total_file_size_bytes,
                 avg_processing_time_seconds
             )
             SELECT 
@@ -384,10 +372,8 @@ class SupabaseManager:
                 %s as exchange,
                 AVG(total_files) as avg_daily_files,
                 AVG(total_records) as avg_daily_records,
-                AVG(total_file_size_bytes) as avg_daily_file_size_bytes,
                 SUM(total_files) as total_files,
                 SUM(total_records) as total_records,
-                SUM(total_file_size_bytes) as total_file_size_bytes,
                 AVG(total_processing_time_seconds) as avg_processing_time_seconds
             FROM gold.daily_load_stats
             WHERE exchange = %s 
@@ -396,10 +382,8 @@ class SupabaseManager:
             ON CONFLICT (week_ending, exchange) DO UPDATE SET
                 avg_daily_files = EXCLUDED.avg_daily_files,
                 avg_daily_records = EXCLUDED.avg_daily_records,
-                avg_daily_file_size_bytes = EXCLUDED.avg_daily_file_size_bytes,
                 total_files = EXCLUDED.total_files,
                 total_records = EXCLUDED.total_records,
-                total_file_size_bytes = EXCLUDED.total_file_size_bytes,
                 avg_processing_time_seconds = EXCLUDED.avg_processing_time_seconds,
                 created_at = NOW()
             """
