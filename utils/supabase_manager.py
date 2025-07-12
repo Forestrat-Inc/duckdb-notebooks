@@ -22,11 +22,11 @@ class SupabaseManager:
     """
     
     def __init__(self, 
-                 host: str = None,
+                 host: str = 'aws-0-us-east-1.pooler.supabase.com',
                  port: int = None,
                  database: str = None, 
-                 user: str = None,
-                 password: str = None):
+                 user: str = 'postgres.tiwvjenslzusbwedbbgr',
+                 password: str = 'QmJrc4HsAVWUyzK'):
         """Initialize Supabase connection"""
         # Use environment variables if parameters not provided
         self.host = host or os.getenv('SUPABASE_HOST')
