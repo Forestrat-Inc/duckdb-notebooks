@@ -15,12 +15,16 @@ import asyncio
 import json
 import logging
 import sys
+import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
+# Add the python-utils directory to the path to import forestrat_utils
+sys.path.insert(0, '/Users/kaushal/Documents/Forestrat/python-utils')
+
 from database import DuckDBConnection
 from config import Config
-from mcp_tools import ForestratTools
+from forestrat_utils.mcp_tools import ForestratTools
 
 config = Config()
 TABLE_MAPPINGS = config.DATASET_MAPPING
