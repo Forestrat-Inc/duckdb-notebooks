@@ -62,8 +62,7 @@ The server behavior remains the same from the client perspective.
 
 ### Using Tools Directly
 ```python
-from forestrat_utils.mcp_tools import ForestratTools
-from database import DuckDBConnection
+from forestrat_utils import ForestratTools, DuckDBConnection
 
 # Initialize database connection
 db = DuckDBConnection("path/to/database.duckdb")
