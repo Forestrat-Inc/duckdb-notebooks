@@ -975,9 +975,15 @@ class ForestratMCPServer:
                     
                     # Send response if needed
                     if response:
-                        response_json = json.dumps(response)
-                        print(response_json, flush=True)
-                        logger.info(f"📤 Sending response: {response_json}")
+                        try:
+                            response_json = json.dumps(response, ensure_ascii=True, separators=(',', ':'))
+                            print(response_json, flush=True)
+                            logger.info(f"📤 Sending response: {response_json}")
+                        except (TypeError, ValueError) as e:
+                            logger.error(f"❌ JSON serialization error: {e}")
+                            error_response = self.create_error(request.get('id'), -32603, f"JSON serialization error: {str(e)}")
+                            error_json = json.dumps(error_response, ensure_ascii=True, separators=(',', ':'))
+                            print(error_json, flush=True)
                     else:
                         logger.info("📤 No response needed (notification)")
                         
@@ -985,13 +991,15 @@ class ForestratMCPServer:
                     logger.error(f"❌ Invalid JSON received: {e}")
                     logger.error(f"❌ Raw line: {line.strip()}")
                     error_response = self.create_error(None, -32700, "Parse error")
-                    print(json.dumps(error_response), flush=True)
+                    error_json = json.dumps(error_response, ensure_ascii=True, separators=(',', ':'))
+                    print(error_json, flush=True)
                 except Exception as e:
                     logger.error(f"❌ Error handling request: {e}")
                     import traceback
                     logger.error(f"❌ Traceback: {traceback.format_exc()}")
                     error_response = self.create_error(None, -32603, "Internal error")
-                    print(json.dumps(error_response), flush=True)
+                    error_json = json.dumps(error_response, ensure_ascii=True, separators=(',', ':'))
+                    print(error_json, flush=True)
                     
         except KeyboardInterrupt:
             logger.info("Server shutting down...")
@@ -1025,9 +1033,9 @@ async def main():
         PYTHON_UTILS_DIR = Path(__file__).parent.parent.parent / "python-utils"
         if PYTHON_UTILS_DIR.exists():
             sys.path.insert(0, str(PYTHON_UTILS_DIR))
-            print(f"✓ Added to Python path: {PYTHON_UTILS_DIR}")
+            print(f"✓ Added to Python path: {PYTHON_UTILS_DIR}", file=sys.stderr)
         else:
-            print(f"✗ Could not find python-utils directory at: {PYTHON_UTILS_DIR}")
+            print(f"✗ Could not find python-utils directory at: {PYTHON_UTILS_DIR}", file=sys.stderr)
             sys.exit(1)
     
     # Make ForestratTools available globally for the server class
@@ -1037,13 +1045,13 @@ async def main():
     try:
         from forestrat_utils import ForestratTools
         if args.dev:
-            print("✓ Successfully imported forestrat_utils modules")
+            print("✓ Successfully imported forestrat_utils modules", file=sys.stderr)
     except ImportError as e:
         if args.dev:
-            print(f"✗ Failed to import forestrat_utils: {e}")
+            print(f"✗ Failed to import forestrat_utils: {e}", file=sys.stderr)
         else:
-            print(f"✗ Failed to import forestrat_utils: {e}")
-            print("Try running with --dev flag if working with local development setup")
+            print(f"✗ Failed to import forestrat_utils: {e}", file=sys.stderr)
+            print("Try running with --dev flag if working with local development setup", file=sys.stderr)
         sys.exit(1)
     
     try:
