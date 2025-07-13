@@ -1,15 +1,40 @@
 #!/bin/bash
 
 # Forestrat MCP Server Status Script
-# Usage: ./server_status.sh [server_file]
+# Usage: ./server_status.sh [server_file] [--dev]
 
 echo "📊 Forestrat MCP Server Status"
 echo "==============================="
 
-# Default server file
-SERVER_FILE="${1:-main_fixed.py}"
+# Parse arguments
+SERVER_FILE="main_fixed.py"
+DEV_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dev|--development)
+            DEV_MODE=true
+            shift
+            ;;
+        *.py)
+            SERVER_FILE="$1"
+            shift
+            ;;
+        *)
+            if [[ "$1" != --* ]]; then
+                SERVER_FILE="$1"
+            fi
+            shift
+            ;;
+    esac
+done
 
 echo "📋 Checking status for: $SERVER_FILE"
+if [ "$DEV_MODE" = true ]; then
+    echo "🛠️  Mode: Development"
+else
+    echo "🏭 Mode: Production"
+fi
 echo ""
 
 # Function to show detailed process status
@@ -19,6 +44,16 @@ show_detailed_status() {
     if [ -n "$PIDS" ]; then
         echo "🟢 Server Status: RUNNING"
         echo "📍 Process IDs: $PIDS"
+        
+        # Check if running in dev mode by examining command line
+        for PID in $PIDS; do
+            CMDLINE=$(ps -p $PID -o command= 2>/dev/null || true)
+            if echo "$CMDLINE" | grep -q "\-\-dev\|\-\-development"; then
+                echo "🛠️  Running Mode: Development"
+            else
+                echo "🏭 Running Mode: Production"
+            fi
+        done
         echo ""
         echo "📋 Process Details:"
         ps -p $PIDS || true
@@ -93,11 +128,13 @@ show_quick_commands() {
     echo ""
     echo "🚀 Quick Commands:"
     echo "------------------"
-    echo "Start/Restart: ./restart_server.sh"
-    echo "Stop Server:   ./stop_server.sh"
-    echo "Check Status:  ./server_status.sh"
-    echo "View Logs:     tail -f forestrat_mcp_server.log"
-    echo "Test Server:   python3 test_activity_fixed.py"
+    echo "Start/Restart (Prod): ./restart_server.sh"
+    echo "Start/Restart (Dev):  ./restart_server.sh --dev"
+    echo "Stop Server:          ./stop_server.sh"
+    echo "Check Status (Prod):  ./server_status.sh"
+    echo "Check Status (Dev):   ./server_status.sh --dev"
+    echo "View Logs:            tail -f forestrat_mcp_server.log"
+    echo "Test Server:          python3 test_activity_fixed.py"
 }
 
 # Main execution

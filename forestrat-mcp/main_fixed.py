@@ -21,7 +21,6 @@ from datetime import datetime
 
 from database import DuckDBConnection
 from config import Config
-from forestrat_utils import ForestratTools
 
 config = Config()
 TABLE_MAPPINGS = config.DATASET_MAPPING
@@ -407,6 +406,34 @@ class ForestratMCPServer:
                     "required": ["product_type", "start_month_name", "start_year", "num_futures"],
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "get_unique_futures_count",
+                "description": "Get the number of unique futures instruments, optionally filtered by exchange and date range, with detailed symbol information",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange filter (LSE, CME, NYQ)"
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start date filter (YYYY-MM-DD)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End date filter (YYYY-MM-DD)"
+                        },
+                        "include_details": {
+                            "type": "boolean",
+                            "description": "Include detailed symbol information with trading statistics"
+                        }
+                    },
+                    "additionalProperties": False
+                }
             }
         ]
         
@@ -510,6 +537,68 @@ class ForestratMCPServer:
                         "required": False
                     }
                 ]
+            },
+            {
+                "name": "get_quarterly_futures_analysis",
+                "description": "Generate futures contracts starting from a specific month and filter to show only quarterly futures (March H, June M, September U, December Z)",
+                "arguments": [
+                    {
+                        "name": "product_type",
+                        "description": "Type of product: 'bitcoin', 'micro bitcoin', 'standard bitcoin', 'btc', 'mbt'",
+                        "required": True
+                    },
+                    {
+                        "name": "start_month_name",
+                        "description": "Starting month name (January, February, March, etc.)",
+                        "required": True
+                    },
+                    {
+                        "name": "start_year",
+                        "description": "Starting year (e.g., 2025)",
+                        "required": True
+                    },
+                    {
+                        "name": "num_quarterly_futures",
+                        "description": "Number of quarterly futures contracts to find (default: 2)",
+                        "required": False
+                    }
+                ]
+            },
+            {
+                "name": "complete_quarterly_futures_analysis",
+                "description": "Complete 3-step sequential analysis: 1) Generate front futures from start month, 2) Filter to quarterly contracts, 3) Compute trades and quotes for those instruments during continuous sessions",
+                "arguments": [
+                    {
+                        "name": "product_type",
+                        "description": "Type of product: 'bitcoin', 'micro bitcoin', 'standard bitcoin', 'btc', 'mbt'",
+                        "required": True
+                    },
+                    {
+                        "name": "start_month_name",
+                        "description": "Starting month name (January, February, March, etc.)",
+                        "required": True
+                    },
+                    {
+                        "name": "start_year",
+                        "description": "Starting year (e.g., 2025)",
+                        "required": True
+                    },
+                    {
+                        "name": "num_front_months",
+                        "description": "Number of front months to generate initially (default: 2)",
+                        "required": False
+                    },
+                    {
+                        "name": "analysis_date",
+                        "description": "Date for trading analysis (YYYY-MM-DD format, optional - uses latest available if not provided)",
+                        "required": False
+                    },
+                    {
+                        "name": "exchange",
+                        "description": "Exchange for trading data (CME, LSE, NYQ - default: CME for crypto futures)",
+                        "required": False
+                    }
+                ]
             }
         ]
         
@@ -526,19 +615,19 @@ class ForestratMCPServer:
         
         resources = [
             {
-                "uri": "forestrat://schemas/bronze_layer",
+                "uri": "forestrat://schemas/bronze",
                 "name": "Bronze Layer Schema",
                 "description": "Current schema and data types for bronze layer tables",
                 "mimeType": "application/json"
             },
             {
-                "uri": "forestrat://schemas/silver_layer", 
+                "uri": "forestrat://schemas/silver", 
                 "name": "Silver Layer Schema",
                 "description": "Current schema and data types for silver layer tables",
                 "mimeType": "application/json"
             },
             {
-                "uri": "forestrat://schemas/gold_layer",
+                "uri": "forestrat://schemas/gold",
                 "name": "Gold Layer Schema", 
                 "description": "Current schema and data types for gold layer tables",
                 "mimeType": "application/json"
@@ -637,6 +726,18 @@ class ForestratMCPServer:
                 content = await self.tools.execute_volume_trend_analysis(arguments)
                 return self.create_response(request_id, {
                     "description": f"Volume trend analysis for {arguments.get('exchange')} from {arguments.get('start_date')} to {arguments.get('end_date')}",
+                    "content": [{"type": "text", "text": content}]
+                })
+            elif name == "get_quarterly_futures_analysis":
+                content = await self.tools.execute_quarterly_futures_analysis(arguments)
+                return self.create_response(request_id, {
+                    "description": f"Quarterly futures analysis for {arguments.get('product_type')} starting from {arguments.get('start_month_name')} {arguments.get('start_year')}",
+                    "content": [{"type": "text", "text": content}]
+                })
+            elif name == "complete_quarterly_futures_analysis":
+                content = await self.tools.execute_complete_quarterly_futures_analysis(arguments)
+                return self.create_response(request_id, {
+                    "description": f"Complete sequential quarterly futures analysis for {arguments.get('product_type')} starting from {arguments.get('start_month_name')} {arguments.get('start_year')}",
                     "content": [{"type": "text", "text": content}]
                 })
             else:
@@ -778,6 +879,13 @@ class ForestratMCPServer:
                     arguments["start_year"],
                     arguments["num_futures"]
                 )
+            elif name == "get_unique_futures_count":
+                result = await self.tools.get_unique_futures_count(
+                    arguments.get("exchange"),
+                    arguments.get("start_date"),
+                    arguments.get("end_date"),
+                    arguments.get("include_details", False)
+                )
             else:
                 logger.error(f"❌ Unknown tool requested: {name}")
                 return self.create_error(request_id, -32601, f"Unknown tool: {name}")
@@ -900,13 +1008,43 @@ class ForestratMCPServer:
 async def main():
     """Main entry point"""
     import argparse
+    from pathlib import Path
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Forestrat MCP Server')
     parser.add_argument('--database-path', '-d', 
                        help='Path to the DuckDB database file',
                        default=None)
+    parser.add_argument('--dev', '--development', 
+                       action='store_true',
+                       help='Run in development mode (adds python-utils to path)')
     args = parser.parse_args()
+    
+    # Handle development mode - add python-utils to path
+    if args.dev:
+        PYTHON_UTILS_DIR = Path(__file__).parent.parent.parent / "python-utils"
+        if PYTHON_UTILS_DIR.exists():
+            sys.path.insert(0, str(PYTHON_UTILS_DIR))
+            print(f"✓ Added to Python path: {PYTHON_UTILS_DIR}")
+        else:
+            print(f"✗ Could not find python-utils directory at: {PYTHON_UTILS_DIR}")
+            sys.exit(1)
+    
+    # Make ForestratTools available globally for the server class
+    global ForestratTools
+    
+    # Import forestrat_utils (either from package or development path)
+    try:
+        from forestrat_utils import ForestratTools
+        if args.dev:
+            print("✓ Successfully imported forestrat_utils modules")
+    except ImportError as e:
+        if args.dev:
+            print(f"✗ Failed to import forestrat_utils: {e}")
+        else:
+            print(f"✗ Failed to import forestrat_utils: {e}")
+            print("Try running with --dev flag if working with local development setup")
+        sys.exit(1)
     
     try:
         # Initialize the server with optional database path

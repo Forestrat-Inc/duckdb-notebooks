@@ -1,0 +1,510 @@
+FORESTRAT MCP SERVER - NATURAL LANGUAGE QUERIES FOR ANALYSTS
+================================================================
+
+This document contains comprehensive natural language queries that analysts can use 
+with the Forestrat MCP server. These queries will be automatically mapped to the 
+appropriate tools, prompts, and resources.
+
+===============================================================================
+📊 DATA DISCOVERY & EXPLORATION QUERIES
+===============================================================================
+
+• What datasets are available in the database?
+• Show me all available datasets with statistics
+• List all datasets including record counts and date ranges
+• What exchanges are available for the bronze dataset?
+• Which exchanges have data in the unified dataset?
+• What's the structure of the LSE market data table?
+• Show me the schema for the CME raw market data table
+• Describe the columns in the bronze layer LSE data
+• What are the data types for the NYQ market data table?
+• Give me an overview of the entire database
+• What's the current state of data quality across all exchanges?
+• Show me database statistics and table counts
+
+===============================================================================
+🔍 SYMBOL DISCOVERY & ANALYSIS QUERIES
+===============================================================================
+
+• What symbols are available on CME for January 2025?
+• Show me all trading instruments on LSE between January 1-31, 2025
+• Which symbols were active on NYQ during the first week of January?
+• List all available symbols for CME with no date restrictions
+• What Bitcoin futures symbols are predefined in the system?
+• Show me all cryptocurrency futures categories
+• What Ethereum futures contracts are available?
+• List all micro Bitcoin futures symbols
+• Which standard Bitcoin futures are in the system?
+• What crypto futures symbols are available on CME?
+• Show me all predefined symbol categories with descriptions
+• What are the available futures categories for efficient queries?
+
+===============================================================================
+📈 TRADING ACTIVITY & VOLUME QUERIES
+===============================================================================
+
+• What were the most active symbols on CME yesterday?
+• Show me the top 20 symbols by volume on LSE for January 17, 2025
+• Which symbols had the highest trading volume on NYQ on January 15?
+• What are the least active symbols on CME for January 17, 2025?
+• Show me the bottom 10 symbols by trade count on LSE yesterday
+• Which symbols had minimal trading activity on NYQ last week?
+• What's the trading volume for Bitcoin futures on CME for January 17?
+• Show me volume data for all crypto futures on January 17, 2025
+• What's the volume and trade count for Ethereum futures yesterday?
+• How much volume did micro Bitcoin futures generate on CME?
+• Show me trading statistics for standard Bitcoin futures
+• What's the combined volume for all cryptocurrency futures on CME?
+
+===============================================================================
+🎯 FUTURES CONTRACT QUERIES
+===============================================================================
+
+• Generate the next 6 Bitcoin futures contracts starting from February 2025
+• What are the next 12 micro Bitcoin futures symbols from January 2025?
+• Show me consecutive Bitcoin futures starting from March 2025
+• Generate 8 futures contracts for micro Bitcoin beginning in April 2025
+• What Bitcoin futures contracts follow after December 2024?
+• Create a futures chain for standard Bitcoin starting January 2025
+• Generate micro Bitcoin futures from February 2025 for 10 contracts
+• What's the symbol sequence for Bitcoin futures from June 2025?
+• Show me the next quarterly Bitcoin futures from January 2025
+• What are the next 4 quarterly futures contracts for Bitcoin?
+• Generate quarterly futures for Bitcoin starting from March 2025
+• Find the next 3 quarterly Bitcoin futures from February 2025
+• How many unique futures instruments are trading on CME?
+• What's the count of unique futures contracts with trading details?
+• Show me unique futures instruments for the month of January 2025
+
+===============================================================================
+📋 COMPREHENSIVE MARKET ANALYSIS QUERIES
+===============================================================================
+
+• Give me a comprehensive daily market summary for CME on January 17, 2025
+• Show me a complete market overview for LSE yesterday
+• What's the daily trading summary for NYQ on January 15, 2025?
+• Provide a detailed market analysis for CME including top performers
+• Give me today's market summary with the top 20 most active symbols
+• Show me yesterday's trading activity summary for all exchanges
+• What's the market overview for CME with volume leaders and statistics?
+
+===============================================================================
+🔄 CROSS-EXCHANGE ANALYSIS QUERIES
+===============================================================================
+
+• Compare BTCF25 trading activity across CME and LSE on January 17, 2025
+• How did AAPL.O perform across all exchanges yesterday?
+• Show me cross-exchange analysis for MSFT.O on January 15, 2025
+• Compare GOOGL.O trading across LSE, CME, and NYQ
+• How does TSLA.O trading compare between exchanges on January 17?
+• Analyze NVDA.O performance across multiple exchanges yesterday
+• Compare Bitcoin futures trading between CME and other exchanges
+
+===============================================================================
+🚨 ANOMALY DETECTION QUERIES
+===============================================================================
+
+• Detect unusual trading patterns on CME for January 17, 2025
+• Find trading anomalies on LSE yesterday with a 2.5 standard deviation threshold
+• Show me unusual volume spikes on NYQ for January 15, 2025
+• Identify outliers in trading activity on CME with 3 sigma threshold
+• What symbols had abnormal trading patterns on LSE yesterday?
+• Find volume anomalies and statistical outliers on CME today
+• Detect unusual price movements on NYQ for January 17, 2025
+
+===============================================================================
+📊 TREND ANALYSIS QUERIES
+===============================================================================
+
+• Show me volume trends for CME from January 10-17, 2025
+• What are the volume patterns for Bitcoin futures over the past week?
+• Analyze volume trends for BTCF25, BTCG25, and MBTF25 from January 10-17
+• Show me weekly volume trends for LSE from January 1-15, 2025
+• What's the volume trend analysis for NYQ over the past 10 days?
+• Analyze trading volume patterns for cryptocurrency futures this week
+• Show me volume trends for top 5 symbols on CME over the past week
+
+===============================================================================
+🔍 DETAILED DATA RETRIEVAL QUERIES
+===============================================================================
+
+• Get all trading data for LSE between January 1-31, 2025
+• Show me CME market data for the first week of January 2025
+• Retrieve NYQ trading data for January 15-17, 2025 with a 5000 record limit
+• Get all data for Bitcoin futures category from January 1-31, 2025
+• Show me raw market data for cryptocurrency futures on CME for January 17
+• Retrieve all trading records for micro Bitcoin futures in January 2025
+• Get complete market data for standard Bitcoin futures for the past month
+
+===============================================================================
+💾 DATA EXPORT QUERIES
+===============================================================================
+
+• Export all Bitcoin futures data from CME for January 2025 to CSV
+• Save cryptocurrency futures data to a JSON file for analysis
+• Export micro Bitcoin futures trading data for the past month
+• Create a CSV export of Ethereum futures data from CME
+• Save all crypto futures data from January 1-31, 2025 to bitcoin_jan_2025.csv
+• Export standard Bitcoin futures data in JSON format
+• Create a data export for all cryptocurrency futures with custom filename
+
+===============================================================================
+🛠️ ADVANCED CUSTOM QUERIES
+===============================================================================
+
+• Show me all Bitcoin futures symbols with their trading volumes for January 17
+• Get daily volume statistics for all crypto futures grouped by symbol
+• Calculate average prices for Bitcoin futures over the past week
+• Show me hourly volume patterns for BTCF25 on January 17, 2025
+• Get volatility statistics for all cryptocurrency futures contracts
+• Calculate trade-weighted average prices for Bitcoin futures
+• Show me price ranges and volatility for micro Bitcoin futures
+• Get correlation analysis between Bitcoin and Ethereum futures volumes
+• Calculate daily returns for all cryptocurrency futures contracts
+• Show me intraday price movements for Bitcoin futures on CME
+
+===============================================================================
+📚 SCHEMA & METADATA QUERIES
+===============================================================================
+
+• What's the current schema for bronze layer tables?
+• Show me the structure of silver layer unified data
+• What are the data types in the gold layer aggregated tables?
+• Describe the bronze layer CME market data schema
+• What columns are available in the LSE raw data table?
+• Show me the metadata for NYQ market data structure
+• What's the schema for the unified market data table?
+
+===============================================================================
+📅 CALENDAR & AVAILABILITY QUERIES
+===============================================================================
+
+• What trading days are available for CME data?
+• Show me the LSE trading calendar with available dates
+• Which dates have NYQ market data available?
+• What's the data availability for CME in January 2025?
+• Show me trading days with data for all exchanges
+• What's the date range for available LSE market data?
+• Which trading days have the most complete data across exchanges?
+
+===============================================================================
+🎯 SYMBOL DIRECTORY QUERIES
+===============================================================================
+
+• What symbols are available in the CME directory?
+• Show me the complete LSE symbol directory with metadata
+• What trading symbols are listed for NYQ?
+• Show me symbol metadata for CME with volume statistics
+• What are the top 100 symbols by volume on LSE?
+• List all available symbols for CME with their trading statistics
+• Show me symbol information for the most active instruments
+
+===============================================================================
+🔄 SEQUENTIAL ANALYSIS WORKFLOWS
+===============================================================================
+
+• Perform complete quarterly futures analysis for Bitcoin starting January 2025
+• Execute full sequential analysis for micro Bitcoin futures from February 2025
+• Run comprehensive quarterly futures analysis with trading data for January 17
+• Perform end-to-end Bitcoin futures analysis for 6 front months
+• Execute complete sequential analysis for quarterly contracts with CME data
+• Run full futures analysis pipeline for Bitcoin starting March 2025
+
+===============================================================================
+📊 PERFORMANCE & RISK QUERIES
+===============================================================================
+
+• What's the volatility ranking for all cryptocurrency futures?
+• Show me risk metrics for Bitcoin futures contracts
+• Calculate beta coefficients for crypto futures vs Bitcoin spot
+• What's the correlation between different Bitcoin futures contracts?
+• Show me drawdown analysis for cryptocurrency futures
+• Calculate Sharpe ratios for all futures contracts
+• What's the tracking error between Bitcoin futures and spot prices?
+
+===============================================================================
+🎨 VISUALIZATION & REPORTING QUERIES
+===============================================================================
+
+• Create a volume heatmap for cryptocurrency futures by hour
+• Generate a correlation matrix for all Bitcoin futures contracts
+• Show me a time series chart of Bitcoin futures volumes
+• Create a volatility surface for cryptocurrency futures
+• Generate a trading activity dashboard for CME
+• Show me a comparison chart of Bitcoin vs Ethereum futures volumes
+• Create a performance attribution report for crypto futures
+
+===============================================================================
+🔧 SYSTEM & DIAGNOSTIC QUERIES
+===============================================================================
+
+• What's the current system status and database health?
+• Show me data quality metrics for all exchanges
+• What's the data completeness percentage for January 2025?
+• Check for any missing data or gaps in the database
+• Show me processing statistics and data ingestion metrics
+• What's the current database size and table statistics?
+• Are there any data quality issues I should be aware of?
+
+===============================================================================
+📈 MARKET MICROSTRUCTURE QUERIES
+===============================================================================
+
+• What's the bid-ask spread analysis for Bitcoin futures?
+• Show me market depth data for cryptocurrency futures
+• What's the order flow analysis for BTCF25 on January 17?
+• Analyze trade size distribution for Bitcoin futures
+• Show me market impact analysis for large trades
+• What's the price discovery mechanism for crypto futures?
+• Analyze tick-by-tick data for cryptocurrency futures
+
+===============================================================================
+🌐 CROSS-ASSET ANALYSIS QUERIES
+===============================================================================
+
+• Compare Bitcoin futures performance vs traditional equity futures
+• Show me correlation between crypto futures and forex markets
+• What's the relationship between Bitcoin futures and spot markets?
+• Analyze cross-asset volatility spillovers
+• Compare cryptocurrency futures with commodity futures performance
+• Show me sector rotation patterns including crypto futures
+• What's the relationship between crypto futures and bond markets?
+
+===============================================================================
+⚡ REAL-TIME MONITORING QUERIES
+===============================================================================
+
+• Monitor Bitcoin futures for unusual activity in real-time
+• Alert me to any volume spikes in cryptocurrency futures
+• Track price movements for top 10 crypto futures contracts
+• Monitor for any trading halts or circuit breakers
+• Show me real-time volatility measures for Bitcoin futures
+• Track order flow imbalances in cryptocurrency futures
+• Monitor for any regulatory news affecting crypto futures
+
+===============================================================================
+📊 BACKTESTING & STRATEGY QUERIES
+===============================================================================
+
+• Backtest a momentum strategy on Bitcoin futures
+• What's the performance of a mean reversion strategy on crypto futures?
+• Test a pairs trading strategy between Bitcoin and Ethereum futures
+• Analyze the effectiveness of technical indicators on crypto futures
+• Backtest a volatility trading strategy on Bitcoin futures
+• What's the performance of a calendar spread strategy?
+• Test arbitrage opportunities between different Bitcoin futures contracts
+
+===============================================================================
+🎯 PORTFOLIO OPTIMIZATION QUERIES
+===============================================================================
+
+• What's the optimal portfolio allocation for cryptocurrency futures?
+• Show me efficient frontier analysis for crypto futures
+• Calculate minimum variance portfolio for Bitcoin futures
+• What's the risk-return profile for different crypto futures strategies?
+• Optimize portfolio weights for cryptocurrency futures
+• Show me diversification benefits of adding crypto futures
+• Calculate Value at Risk for a crypto futures portfolio
+
+===============================================================================
+📈 ADVANCED ANALYTICS QUERIES
+===============================================================================
+
+• Apply machine learning models to predict Bitcoin futures prices
+• What patterns emerge from clustering analysis of crypto futures?
+• Show me principal component analysis of cryptocurrency futures returns
+• Apply time series forecasting to Bitcoin futures volumes
+• What's the regime switching analysis for crypto futures volatility?
+• Show me factor analysis of cryptocurrency futures returns
+• Apply neural networks to crypto futures price prediction
+
+===============================================================================
+🔍 REGULATORY & COMPLIANCE QUERIES
+===============================================================================
+
+• What's the position limit analysis for Bitcoin futures?
+• Show me large trader reporting data for crypto futures
+• What's the commitment of traders report for cryptocurrency futures?
+• Analyze open interest data for Bitcoin futures contracts
+• Show me margin requirements for cryptocurrency futures
+• What's the settlement price analysis for crypto futures?
+• Monitor for any regulatory changes affecting crypto futures trading
+
+===============================================================================
+📚 EDUCATIONAL & RESEARCH QUERIES
+===============================================================================
+
+• Explain the contract specifications for Bitcoin futures
+• What are the key differences between Bitcoin and Ethereum futures?
+• Show me the historical evolution of cryptocurrency futures markets
+• What's the impact of Bitcoin ETF approvals on futures markets?
+• Explain the relationship between futures and spot Bitcoin prices
+• What are the main drivers of cryptocurrency futures volatility?
+• Show me academic research on cryptocurrency futures markets
+
+===============================================================================
+💡 INNOVATION & DEVELOPMENT QUERIES
+===============================================================================
+
+• What new cryptocurrency futures products are being developed?
+• Show me innovation trends in digital asset futures markets
+• What's the potential for DeFi integration with traditional futures?
+• Analyze the impact of central bank digital currencies on crypto futures
+• What are the emerging technologies in cryptocurrency derivatives?
+• Show me the evolution of crypto futures market structure
+• What's the future of cryptocurrency futures regulation?
+
+===============================================================================
+🎲 SCENARIO ANALYSIS QUERIES
+===============================================================================
+
+• What if Bitcoin price drops 50% - impact on futures markets?
+• Analyze cryptocurrency futures performance during market stress
+• What's the impact of regulatory ban on crypto futures trading?
+• Show me scenario analysis for different volatility regimes
+• What happens to crypto futures during a traditional market crash?
+• Analyze the impact of major exchange outages on futures markets
+• What's the effect of whale trading on cryptocurrency futures?
+
+===============================================================================
+🌟 SPECIALIZED ANALYSIS QUERIES
+===============================================================================
+
+• What's the seasonality analysis for Bitcoin futures?
+• Show me calendar effects in cryptocurrency futures markets
+• What's the day-of-week effect on crypto futures returns?
+• Analyze holidays impact on cryptocurrency futures trading
+• What's the time-of-day effect on Bitcoin futures volumes?
+• Show me monthly patterns in crypto futures performance
+• What's the quarter-end effect on cryptocurrency futures?
+
+===============================================================================
+🔮 PREDICTIVE ANALYTICS QUERIES
+===============================================================================
+
+• Predict next month's Bitcoin futures volumes using historical data
+• What's the forecast for cryptocurrency futures market growth?
+• Predict volatility spikes in Bitcoin futures using machine learning
+• What's the expected correlation between Bitcoin and Ethereum futures?
+• Forecast the impact of upcoming Fed meetings on crypto futures
+• Predict the next major move in Bitcoin futures using technical analysis
+• What's the probability of Bitcoin futures reaching new highs?
+
+===============================================================================
+📊 MULTI-DIMENSIONAL ANALYSIS QUERIES
+===============================================================================
+
+• Show me 3D volatility surface for Bitcoin futures across time and strikes
+• Create a multi-dimensional risk analysis for crypto futures portfolio
+• What's the cross-sectional momentum in cryptocurrency futures?
+• Show me factor loadings across different crypto futures contracts
+• Analyze time-varying correlations between crypto futures
+• What's the regime-dependent analysis of crypto futures returns?
+• Show me multi-scale analysis of Bitcoin futures price movements
+
+===============================================================================
+🎯 PRECISION TRADING QUERIES
+===============================================================================
+
+• What's the optimal execution strategy for large Bitcoin futures orders?
+• Show me market impact models for cryptocurrency futures
+• What's the best time to trade Bitcoin futures to minimize slippage?
+• Analyze order book dynamics for cryptocurrency futures
+• What's the liquidity analysis for different crypto futures contracts?
+• Show me transaction cost analysis for Bitcoin futures trading
+• What's the optimal lot size for cryptocurrency futures trades?
+
+===============================================================================
+🏆 PERFORMANCE ATTRIBUTION QUERIES
+===============================================================================
+
+• What factors drove Bitcoin futures performance last month?
+• Show me attribution analysis for cryptocurrency futures returns
+• What's the contribution of different risk factors to crypto futures performance?
+• Analyze skill vs luck in cryptocurrency futures trading
+• What's the information ratio for different crypto futures strategies?
+• Show me risk-adjusted performance metrics for Bitcoin futures
+• What's the active return decomposition for crypto futures strategies?
+
+===============================================================================
+🔍 FORENSIC ANALYSIS QUERIES
+===============================================================================
+
+• Investigate unusual trading patterns in Bitcoin futures on specific dates
+• What caused the volume spike in cryptocurrency futures yesterday?
+• Analyze the market impact of major news events on crypto futures
+• What's the post-earnings drift analysis for crypto-related stocks vs futures?
+• Investigate potential manipulation in cryptocurrency futures markets
+• What's the impact of social media sentiment on Bitcoin futures prices?
+• Analyze the effect of whale movements on cryptocurrency futures
+
+===============================================================================
+📱 MOBILE & REAL-TIME QUERIES
+===============================================================================
+
+• Send me alerts for Bitcoin futures price movements above 5%
+• What's the current bid-ask spread for active crypto futures contracts?
+• Show me real-time P&L for cryptocurrency futures positions
+• What's the live Greeks for Bitcoin futures options?
+• Monitor real-time margin requirements for crypto futures
+• Show me live sentiment analysis for cryptocurrency futures
+• What's the current funding rate for Bitcoin futures?
+
+===============================================================================
+🎮 GAMIFICATION & EDUCATION QUERIES
+===============================================================================
+
+• Create a trading simulation for Bitcoin futures
+• What's my paper trading performance on cryptocurrency futures?
+• Show me educational scenarios for crypto futures trading
+• Create a risk management game using Bitcoin futures
+• What's the leaderboard for cryptocurrency futures predictions?
+• Show me interactive tutorials for crypto futures analysis
+• Create a virtual portfolio challenge with Bitcoin futures
+
+===============================================================================
+🌈 ALTERNATIVE DATA QUERIES
+===============================================================================
+
+• What's the relationship between Bitcoin futures and Google search trends?
+• Show me correlation between crypto futures and social media sentiment
+• What's the impact of options flow on Bitcoin futures prices?
+• Analyze the relationship between crypto futures and blockchain metrics
+• What's the effect of institutional flows on cryptocurrency futures?
+• Show me the relationship between futures and crypto exchange flows
+• What's the impact of DeFi TVL on cryptocurrency futures?
+
+===============================================================================
+📈 MACRO ANALYSIS QUERIES
+===============================================================================
+
+• What's the relationship between Bitcoin futures and macro economic indicators?
+• Show me correlation between crypto futures and currency markets
+• What's the impact of inflation data on cryptocurrency futures?
+• Analyze the relationship between crypto futures and bond yields
+• What's the effect of Fed policy on Bitcoin futures markets?
+• Show me the relationship between crypto futures and commodity prices
+• What's the impact of geopolitical events on cryptocurrency futures?
+
+===============================================================================
+🎯 CONCLUSION
+===============================================================================
+
+These natural language queries provide comprehensive coverage of all capabilities 
+available in the Forestrat MCP server. Analysts can use these queries directly 
+in conversation with Claude, and they will be automatically mapped to the 
+appropriate tools, prompts, and resources.
+
+The queries are organized by category to help analysts find the right type of 
+analysis for their needs, from basic data discovery to advanced predictive 
+analytics and specialized research applications.
+
+For best results, analysts should:
+1. Start with broad exploratory queries
+2. Drill down to specific analyses based on initial findings
+3. Combine multiple query types for comprehensive analysis
+4. Use the export functionality to save results for further processing
+5. Leverage the sequential analysis workflows for complex research projects
+
+This comprehensive query library enables analysts to unlock the full potential 
+of the multi-exchange financial data lake through natural language interaction. 
