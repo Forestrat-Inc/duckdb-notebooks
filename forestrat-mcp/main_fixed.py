@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Forestrat MCP Server - Fixed Version
+Forestrat MCP Server - Fixed Version with Streaming
 
 Multi-exchange data lake MCP server with manual JSON-RPC implementation 
 to avoid pydantic validation issues in the MCP library.
@@ -9,6 +9,11 @@ This server provides access to DuckDB data lake containing:
 - LSE (London Stock Exchange) market data  
 - CME (Chicago Mercantile Exchange) data
 - NYQ (New York Stock Exchange) data
+
+Features:
+- Streaming responses for long-running operations
+- Progress notifications during tool execution
+- Compatible with MCP protocol via JSON-RPC over stdio
 """
 
 import asyncio
@@ -16,7 +21,8 @@ import json
 import logging
 import sys
 import os
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional, AsyncGenerator
 from datetime import datetime
 
 from database import DuckDBConnection
@@ -40,8 +46,58 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class StreamingProgress:
+    """Class to handle streaming progress updates"""
+    
+    def __init__(self, server_instance, request_id: str, tool_name: str):
+        self.server = server_instance
+        self.request_id = request_id
+        self.tool_name = tool_name
+        self.step_count = 0
+        
+    async def update(self, message: str, progress_percent: Optional[float] = None, data: Optional[Dict] = None):
+        """Send a progress update notification"""
+        self.step_count += 1
+        
+        notification = {
+            "jsonrpc": "2.0",
+            "method": "notifications/progress",
+            "params": {
+                "progressToken": self.request_id,
+                "value": {
+                    "kind": "report",
+                    "message": message,
+                    "percentage": progress_percent,
+                    "step": self.step_count,
+                    "tool": self.tool_name,
+                    "data": data or {}
+                }
+            }
+        }
+        
+        await self.server._send_notification(notification)
+        
+    async def complete(self, message: str = "Operation completed"):
+        """Send completion notification"""
+        notification = {
+            "jsonrpc": "2.0", 
+            "method": "notifications/progress",
+            "params": {
+                "progressToken": self.request_id,
+                "value": {
+                    "kind": "end",
+                    "message": message,
+                    "percentage": 100,
+                    "step": self.step_count + 1,
+                    "tool": self.tool_name
+                }
+            }
+        }
+        
+        await self.server._send_notification(notification)
+
 class ForestratMCPServer:
-    """Forestrat MCP Server using manual JSON-RPC implementation"""
+    """Forestrat MCP Server using manual JSON-RPC implementation with streaming support"""
     
     def __init__(self, database_path: Optional[str] = None):
         import os
@@ -51,7 +107,17 @@ class ForestratMCPServer:
         self.db = DuckDBConnection(database_path)
         self.tools = ForestratTools(self.db)
         self.initialized = False
-        logger.info("Forestrat MCP Server initialized")
+        self.streaming_enabled = True  # Enable streaming by default
+        logger.info("Forestrat MCP Server with Streaming initialized")
+    
+    async def _send_notification(self, notification: Dict[str, Any]):
+        """Send a notification (no response expected)"""
+        try:
+            notification_json = json.dumps(notification, ensure_ascii=True, separators=(',', ':'))
+            print(notification_json, flush=True)
+            logger.info(f"📡 Sent progress notification: {notification['params']['value']['message']}")
+        except Exception as e:
+            logger.error(f"❌ Error sending notification: {e}")
     
     def create_response(self, request_id: Optional[Any], result: Any) -> Dict[str, Any]:
         """Create a JSON-RPC response"""
@@ -77,12 +143,21 @@ class ForestratMCPServer:
         logger.info("Handling initialize request")
         self.initialized = True
         
+        # Check if client supports progress notifications
+        client_capabilities = params.get("capabilities", {})
+        self.streaming_enabled = client_capabilities.get("experimental", {}).get("progressNotifications", True)
+        
+        logger.info(f"Streaming enabled: {self.streaming_enabled}")
+        
         return self.create_response(request_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {
                 "tools": {},
                 "prompts": {},
-                "resources": {}
+                "resources": {},
+                "experimental": {
+                    "progressNotifications": True
+                }
             },
             "serverInfo": {
                 "name": "forestrat-mcp",
@@ -1063,7 +1138,7 @@ class ForestratMCPServer:
             return self.create_error(request_id, -32603, f"Internal error: {str(e)}")
     
     async def handle_call_tool(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle tools/call request"""
+        """Handle tools/call request with streaming support"""
         name = params.get("name")
         arguments = params.get("arguments", {})
         
@@ -1074,12 +1149,24 @@ class ForestratMCPServer:
             logger.error("❌ Server not initialized for tool call")
             return self.create_error(request_id, -32002, "Server not initialized")
         
+        # Create streaming progress tracker if enabled
+        progress = None
+        if self.streaming_enabled:
+            progress = StreamingProgress(self, str(request_id), name)
+            await progress.update(f"Starting {name} execution", 0)
+        
         try:
             if name == "list_datasets":
+                if progress:
+                    await progress.update("Gathering dataset information", 20)
                 result = await self.tools.list_datasets(arguments.get("include_stats", False))
             elif name == "get_dataset_exchanges":
+                if progress:
+                    await progress.update("Querying dataset exchanges", 30)
                 result = await self.tools.get_dataset_exchanges(arguments["dataset"])
             elif name == "get_data_for_time_range":
+                if progress:
+                    await progress.update("Executing time range query", 25)
                 result = await self.tools.get_data_for_time_range(
                     arguments["dataset"],
                     arguments["start_date"],
@@ -1087,11 +1174,17 @@ class ForestratMCPServer:
                     arguments.get("exchange"),
                     arguments.get("limit", 1000)
                 )
+                if progress:
+                    await progress.update("Processing query results", 75)
             elif name == "query_data":
+                if progress:
+                    await progress.update("Executing SQL query", 30)
                 result = await self.tools.query_data(
                     arguments["query"],
                     arguments.get("limit", 1000)
                 )
+                if progress:
+                    await progress.update("Formatting query results", 80)
             elif name == "get_table_schema":
                 result = await self.tools.get_table_schema(arguments["table_name"])
             elif name == "get_available_symbols":
@@ -1129,6 +1222,8 @@ class ForestratMCPServer:
                     arguments.get("metric", "both")
                 )
             elif name == "export_category_data":
+                if progress:
+                    await progress.update("Preparing data export", 10)
                 result = await self.tools.export_category_data(
                     arguments["category"],
                     arguments["exchange"],
@@ -1137,7 +1232,11 @@ class ForestratMCPServer:
                     arguments.get("output_filename"),
                     arguments.get("format")
                 )
+                if progress:
+                    await progress.update("Export completed successfully", 90)
             elif name == "get_next_futures_symbols":
+                if progress:
+                    await progress.update("Calculating next futures symbols", 40)
                 result = await self.tools.get_next_futures_symbols(
                     arguments["product_type"],
                     arguments["start_month_name"],
@@ -1145,6 +1244,8 @@ class ForestratMCPServer:
                     arguments["num_futures"]
                 )
             elif name == "get_unique_futures_count":
+                if progress:
+                    await progress.update("Analyzing futures contracts", 35)
                 result = await self.tools.get_unique_futures_count(
                     arguments.get("exchange"),
                     arguments.get("start_date"),
@@ -1152,12 +1253,18 @@ class ForestratMCPServer:
                     arguments.get("include_details", False)
                 )
             elif name == "get_btc_eth_futures_volume_correlation":
+                if progress:
+                    await progress.update("Analyzing BTC-ETH correlation", 20)
                 result = await self.tools.get_btc_eth_futures_volume_correlation(
                     arguments["start_date"],
                     arguments["end_date"],
                     arguments.get("exchange", "CME")
                 )
+                if progress:
+                    await progress.update("Correlation analysis complete", 85)
             elif name == "generate_minute_bars_csv":
+                if progress:
+                    await progress.update("Initializing minute bars generation", 5)
                 result = await self.tools.generate_minute_bars_csv(
                     arguments["symbols"],
                     arguments["start_date"],
@@ -1167,7 +1274,11 @@ class ForestratMCPServer:
                     arguments.get("session_start", "08:00:00"),
                     arguments.get("session_end", "17:00:00")
                 )
+                if progress:
+                    await progress.update("Minute bars CSV generation complete", 95)
             elif name == "generate_minute_bars_data":
+                if progress:
+                    await progress.update("Processing minute bars data", 15)
                 result = await self.tools.generate_minute_bars_data(
                     arguments["symbols"],
                     arguments["start_date"],
@@ -1176,7 +1287,11 @@ class ForestratMCPServer:
                     arguments.get("session_start", "08:00:00"),
                     arguments.get("session_end", "17:00:00")
                 )
+                if progress:
+                    await progress.update("Minute bars data processing complete", 90)
             elif name == "generate_minute_bars_python_function":
+                if progress:
+                    await progress.update("Generating Python function code", 25)
                 result = await self.tools.generate_minute_bars_python_function(
                     arguments["symbols"],
                     arguments["start_date"],
@@ -1185,16 +1300,28 @@ class ForestratMCPServer:
                     arguments.get("session_start", "08:00:00"),
                     arguments.get("session_end", "17:00:00")
                 )
+                if progress:
+                    await progress.update("Python function generation complete", 85)
             elif name == "analyze_minute_bars":
+                if progress:
+                    await progress.update("Starting minute bars analysis", 10)
                 result = await self.tools.execute_minute_bars_analysis(arguments)
+                if progress:
+                    await progress.update("Minute bars analysis complete", 90)
             elif name == "check_exchange_holidays":
+                if progress:
+                    await progress.update("Checking exchange holiday information", 20)
                 result = await self.tools.check_exchange_holidays(
                     arguments["exchange"],
                     arguments["date"],
                     arguments.get("api_key"),
                     arguments.get("groq_api_key")
                 )
+                if progress:
+                    await progress.update("Holiday check complete", 80)
             elif name == "get_exchange_holidays_for_year":
+                if progress:
+                    await progress.update("Retrieving annual holiday data", 15)
                 result = await self.tools.get_exchange_holidays_for_year(
                     arguments["exchange"],
                     arguments["year"],
@@ -1202,9 +1329,15 @@ class ForestratMCPServer:
                     arguments.get("api_key"),
                     arguments.get("groq_api_key")
                 )
+                if progress:
+                    await progress.update("Annual holiday data retrieved", 85)
             else:
                 logger.error(f"❌ Unknown tool requested: {name}")
                 return self.create_error(request_id, -32601, f"Unknown tool: {name}")
+                
+            # Send completion notification if streaming is enabled
+            if progress:
+                await progress.complete(f"Tool {name} completed successfully")
                 
             logger.info(f"✅ Tool {name} completed successfully")
             logger.info(f"📊 Result summary: {len(str(result))} characters")
@@ -1219,6 +1352,10 @@ class ForestratMCPServer:
             })
                 
         except Exception as e:
+            # Send error notification if streaming is enabled
+            if progress:
+                await progress.update(f"Error in {name}: {str(e)}", None)
+                
             logger.error(f"❌ Error in tool {name}: {str(e)}")
             import traceback
             logger.error(f"❌ Tool error traceback: {traceback.format_exc()}")
