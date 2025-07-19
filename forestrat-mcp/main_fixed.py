@@ -145,7 +145,8 @@ class ForestratMCPServer:
         
         # Check if client supports progress notifications
         client_capabilities = params.get("capabilities", {})
-        self.streaming_enabled = client_capabilities.get("experimental", {}).get("progressNotifications", True)
+        progress_notifications = client_capabilities.get("experimental", {}).get("progressNotifications")
+        self.streaming_enabled = isinstance(progress_notifications, dict) or progress_notifications is not None
         
         logger.info(f"Streaming enabled: {self.streaming_enabled}")
         
@@ -156,7 +157,7 @@ class ForestratMCPServer:
                 "prompts": {},
                 "resources": {},
                 "experimental": {
-                    "progressNotifications": True
+                    "progressNotifications": {}
                 }
             },
             "serverInfo": {

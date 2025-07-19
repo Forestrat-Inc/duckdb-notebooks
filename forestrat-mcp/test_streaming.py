@@ -58,7 +58,7 @@ class StreamingMCPClient:
                 "protocolVersion": "2024-11-05",
                 "capabilities": {
                     "experimental": {
-                        "progressNotifications": True
+                        "progressNotifications": {}
                     }
                 },
                 "clientInfo": {

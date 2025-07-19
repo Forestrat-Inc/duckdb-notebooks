@@ -26,7 +26,7 @@ The server detects streaming support during initialization:
   "params": {
     "capabilities": {
       "experimental": {
-        "progressNotifications": true
+        "progressNotifications": {}
       }
     }
   }
@@ -173,24 +173,24 @@ You can test streaming manually using JSON-RPC:
 # Start server
 python main_fixed.py
 
-# Send initialization (in another terminal)
-echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {"experimental": {"progressNotifications": true}}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | python main_fixed.py
+ # Send initialization (in another terminal)
+ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {"experimental": {"progressNotifications": {}}}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | python main_fixed.py
 ```
 
 ## Client Implementation
 
 ### Supporting Streaming in Your Client
 
-1. **Declare capability** during initialization:
-   ```json
-   {
-     "capabilities": {
-       "experimental": {
-         "progressNotifications": true
-       }
-     }
-   }
-   ```
+ 1. **Declare capability** during initialization:
+    ```json
+    {
+      "capabilities": {
+        "experimental": {
+          "progressNotifications": {}
+        }
+      }
+    }
+    ```
 
 2. **Listen for progress notifications**:
    - Method: `notifications/progress`
@@ -313,7 +313,7 @@ Potential improvements for future versions:
 
 ### No Progress Notifications
 
-1. Check client capabilities include `progressNotifications: true`
+ 1. Check client capabilities include `progressNotifications: {}`
 2. Verify server streaming is enabled
 3. Check for JSON parsing errors in logs
 
