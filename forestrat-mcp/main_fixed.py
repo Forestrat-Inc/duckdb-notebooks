@@ -434,6 +434,214 @@ class ForestratMCPServer:
                     },
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "get_btc_eth_futures_volume_correlation",
+                "description": "Compute the correlation between bitcoin and ether futures daily volume for a date range (CME only)",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start date (YYYY-MM-DD)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End date (YYYY-MM-DD)"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange to use (default: CME)"
+                        }
+                    },
+                    "required": ["start_date", "end_date"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "generate_minute_bars_csv",
+                "description": "Generate minute bars for specified symbols and export to CSV file",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbols": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of RIC symbols to process (e.g., ['BTCH25', 'BTCM25'])"
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start date (YYYY-MM-DD)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End date (YYYY-MM-DD)"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange name (default: CME)"
+                        },
+                        "output_filename": {
+                            "type": "string",
+                            "description": "Output filename (optional, auto-generated if not provided)"
+                        },
+                        "session_start": {
+                            "type": "string",
+                            "description": "Trading session start time (HH:MM:SS, default: 08:00:00)"
+                        },
+                        "session_end": {
+                            "type": "string",
+                            "description": "Trading session end time (HH:MM:SS, default: 17:00:00)"
+                        }
+                    },
+                    "required": ["symbols", "start_date", "end_date"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "generate_minute_bars_data",
+                "description": "Generate minute bars data for Jupyter notebook analysis",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbols": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of RIC symbols to process (e.g., ['BTCH25', 'BTCM25'])"
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start date (YYYY-MM-DD)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End date (YYYY-MM-DD)"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange name (default: CME)"
+                        },
+                        "session_start": {
+                            "type": "string",
+                            "description": "Trading session start time (HH:MM:SS, default: 08:00:00)"
+                        },
+                        "session_end": {
+                            "type": "string",
+                            "description": "Trading session end time (HH:MM:SS, default: 17:00:00)"
+                        }
+                    },
+                    "required": ["symbols", "start_date", "end_date"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "generate_minute_bars_python_function",
+                "description": "Generate a complete Python function for minute bars analysis that users can modify and run",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbols": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of RIC symbols to process (e.g., ['BTCH25', 'BTCM25'])"
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start date (YYYY-MM-DD)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End date (YYYY-MM-DD)"
+                        },
+                        "exchange": {
+                            "type": "string",
+                            "description": "Exchange name (default: CME)"
+                        },
+                        "session_start": {
+                            "type": "string",
+                            "description": "Trading session start time (HH:MM:SS, default: 08:00:00)"
+                        },
+                        "session_end": {
+                            "type": "string",
+                            "description": "Trading session end time (HH:MM:SS, default: 17:00:00)"
+                        }
+                    },
+                    "required": ["symbols", "start_date", "end_date"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "check_exchange_holidays",
+                "description": "Check if a specific date is a holiday for a given exchange using web scraping and LLM analysis (CME, LSE, NYQ)",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "exchange": {
+                            "type": "string",
+                            "enum": ["CME", "LSE", "NYQ"],
+                            "description": "Exchange name (CME, LSE, or NYQ)"
+                        },
+                        "date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Date to check in YYYY-MM-DD format"
+                        },
+                        "api_key": {
+                            "type": "string",
+                            "description": "Firecrawl API key (optional, uses environment variable if not provided)"
+                        },
+                        "groq_api_key": {
+                            "type": "string",
+                            "description": "Groq API key for LLM analysis (optional, uses environment variable if not provided)"
+                        }
+                    },
+                    "required": ["exchange", "date"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_exchange_holidays_for_year",
+                "description": "Get all holidays for an exchange for a specific year or range of years using AI-powered analysis",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "exchange": {
+                            "type": "string",
+                            "enum": ["CME", "LSE", "NYQ"],
+                            "description": "Exchange name (CME, LSE, or NYQ)"
+                        },
+                        "year": {
+                            "type": "integer",
+                            "minimum": 2020,
+                            "maximum": 2030,
+                            "description": "Starting year for holiday analysis (e.g., 2025)"
+                        },
+                        "end_year": {
+                            "type": "integer",
+                            "minimum": 2020,
+                            "maximum": 2030,
+                            "description": "Optional ending year for multi-year analysis (e.g., 2026)"
+                        },
+                        "api_key": {
+                            "type": "string",
+                            "description": "Firecrawl API key (optional, uses environment variable if not provided)"
+                        },
+                        "groq_api_key": {
+                            "type": "string",
+                            "description": "Groq API key for LLM analysis (optional, uses environment variable if not provided)"
+                        }
+                    },
+                    "required": ["exchange", "year"],
+                    "additionalProperties": False
+                }
             }
         ]
         
@@ -599,6 +807,47 @@ class ForestratMCPServer:
                         "required": False
                     }
                 ]
+            },
+            {
+                "name": "analyze_minute_bars",
+                "description": "Generate minute bars analysis for specified symbols with comprehensive statistics and data export options",
+                "arguments": [
+                    {
+                        "name": "symbols",
+                        "description": "Comma-separated list of RIC symbols to analyze (e.g., 'BTCH25,BTCM25,BTCU25')",
+                        "required": True
+                    },
+                    {
+                        "name": "start_date",
+                        "description": "Start date for analysis (YYYY-MM-DD)",
+                        "required": True
+                    },
+                    {
+                        "name": "end_date",
+                        "description": "End date for analysis (YYYY-MM-DD)",
+                        "required": True
+                    },
+                    {
+                        "name": "exchange",
+                        "description": "Exchange to analyze (default: CME)",
+                        "required": False
+                    },
+                    {
+                        "name": "session_start",
+                        "description": "Trading session start time (HH:MM:SS, default: 08:00:00)",
+                        "required": False
+                    },
+                    {
+                        "name": "session_end",
+                        "description": "Trading session end time (HH:MM:SS, default: 17:00:00)",
+                        "required": False
+                    },
+                    {
+                        "name": "export_csv",
+                        "description": "Whether to export results to CSV (default: false)",
+                        "required": False
+                    }
+                ]
             }
         ]
         
@@ -738,6 +987,22 @@ class ForestratMCPServer:
                 content = await self.tools.execute_complete_quarterly_futures_analysis(arguments)
                 return self.create_response(request_id, {
                     "description": f"Complete sequential quarterly futures analysis for {arguments.get('product_type')} starting from {arguments.get('start_month_name')} {arguments.get('start_year')}",
+                    "content": [{"type": "text", "text": content}]
+                })
+            elif name == "get_btc_eth_futures_volume_correlation":
+                content = await self.tools.get_btc_eth_futures_volume_correlation(
+                    arguments["start_date"],
+                    arguments["end_date"],
+                    arguments.get("exchange", "CME")
+                )
+                return self.create_response(request_id, {
+                    "description": f"BTC-ETH Futures Volume Correlation for {arguments.get('start_date')} to {arguments.get('end_date')} on {arguments.get('exchange', 'CME')}",
+                    "content": [{"type": "text", "text": content}]
+                })
+            elif name == "analyze_minute_bars":
+                content = await self.tools.execute_minute_bars_analysis(arguments)
+                return self.create_response(request_id, {
+                    "description": f"Minute bars analysis for {arguments.get('symbols')} from {arguments.get('start_date')} to {arguments.get('end_date')}",
                     "content": [{"type": "text", "text": content}]
                 })
             else:
@@ -885,6 +1150,57 @@ class ForestratMCPServer:
                     arguments.get("start_date"),
                     arguments.get("end_date"),
                     arguments.get("include_details", False)
+                )
+            elif name == "get_btc_eth_futures_volume_correlation":
+                result = await self.tools.get_btc_eth_futures_volume_correlation(
+                    arguments["start_date"],
+                    arguments["end_date"],
+                    arguments.get("exchange", "CME")
+                )
+            elif name == "generate_minute_bars_csv":
+                result = await self.tools.generate_minute_bars_csv(
+                    arguments["symbols"],
+                    arguments["start_date"],
+                    arguments["end_date"],
+                    arguments.get("exchange", "CME"),
+                    arguments.get("output_filename"),
+                    arguments.get("session_start", "08:00:00"),
+                    arguments.get("session_end", "17:00:00")
+                )
+            elif name == "generate_minute_bars_data":
+                result = await self.tools.generate_minute_bars_data(
+                    arguments["symbols"],
+                    arguments["start_date"],
+                    arguments["end_date"],
+                    arguments.get("exchange", "CME"),
+                    arguments.get("session_start", "08:00:00"),
+                    arguments.get("session_end", "17:00:00")
+                )
+            elif name == "generate_minute_bars_python_function":
+                result = await self.tools.generate_minute_bars_python_function(
+                    arguments["symbols"],
+                    arguments["start_date"],
+                    arguments["end_date"],
+                    arguments.get("exchange", "CME"),
+                    arguments.get("session_start", "08:00:00"),
+                    arguments.get("session_end", "17:00:00")
+                )
+            elif name == "analyze_minute_bars":
+                result = await self.tools.execute_minute_bars_analysis(arguments)
+            elif name == "check_exchange_holidays":
+                result = await self.tools.check_exchange_holidays(
+                    arguments["exchange"],
+                    arguments["date"],
+                    arguments.get("api_key"),
+                    arguments.get("groq_api_key")
+                )
+            elif name == "get_exchange_holidays_for_year":
+                result = await self.tools.get_exchange_holidays_for_year(
+                    arguments["exchange"],
+                    arguments["year"],
+                    arguments.get("end_year"),
+                    arguments.get("api_key"),
+                    arguments.get("groq_api_key")
                 )
             else:
                 logger.error(f"❌ Unknown tool requested: {name}")
